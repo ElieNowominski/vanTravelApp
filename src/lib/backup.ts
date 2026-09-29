@@ -167,6 +167,7 @@ function parseDraft(value: unknown): BackupDraft | null {
     legs: Array.isArray(state.legs) ? (state.legs as TripSnapshot["legs"]) : [],
     customPins: Array.isArray(state.customPins) ? (state.customPins as TripSnapshot["customPins"]) : [],
     currentDayIndex: typeof state.currentDayIndex === "number" ? state.currentDayIndex : 0,
+    frozenAt: typeof state.frozenAt === "string" ? state.frozenAt : null,
     marks: normalizeMarks(state.marks as TripMark[] | undefined),
     activeSavedId: typeof state.activeSavedId === "string" ? state.activeSavedId : null,
     activeSavedName: typeof state.activeSavedName === "string" ? state.activeSavedName : null,

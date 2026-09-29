@@ -55,6 +55,7 @@ export function buildSavedTrip(
     legs: structuredClone(snapshot.legs),
     customPins: structuredClone(snapshot.customPins),
     currentDayIndex: snapshot.currentDayIndex,
+    frozenAt: snapshot.frozenAt ?? null,
   };
 }
 

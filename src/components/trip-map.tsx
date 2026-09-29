@@ -20,6 +20,7 @@ import type { CatalogPlace, LayersState, PlaceInput, PlaceKind } from "@/lib/typ
 import { selectedOption, useTripStore } from "@/store/trip-store";
 import { AlternativesCard } from "@/components/alternatives-card";
 import { CustomPinDialog } from "@/components/custom-pin-dialog";
+import { DatasetNotice, type DatasetProblem } from "@/components/dataset-notice";
 import { LayerControls } from "@/components/layer-controls";
 
 const CLICKABLE = [
@@ -441,12 +442,13 @@ export function TripMap() {
           Carte : {mapError}
         </div>
       )}
-      <LayerControls
-        campsError={campsError}
-        osmCampsError={osmCampsError}
-        freedomError={freedomError}
-        campsLoading={!camps && !campsError}
-        osmCampsLoading={!osmCamps && !osmCampsError}
+      <LayerControls campsLoading={!camps && !campsError} osmCampsLoading={!osmCamps && !osmCampsError} />
+      <DatasetNotice
+        problems={[
+          campsError ? { label: "Campings DOC", message: campsError } : null,
+          osmCampsError ? { label: "Holiday parks et aires OSM", message: osmCampsError } : null,
+          freedomError ? { label: "Freedom camping", message: freedomError } : null,
+        ].filter((p): p is DatasetProblem => p != null)}
       />
       <AlternativesCard />
       {routingStatus !== "idle" || routingMessage ? (

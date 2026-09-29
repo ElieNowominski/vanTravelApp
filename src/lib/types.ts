@@ -82,6 +82,8 @@ export type TripSnapshot = {
   legs: Leg[];
   customPins: PlaceInput[];
   currentDayIndex: number;
+  /** Date ISO du figeage de l'itinéraire (une géométrie par tronçon) ; `null` tant qu'on planifie. */
+  frozenAt?: string | null;
 };
 
 export type TripMarkKind = "plus" | "minus";

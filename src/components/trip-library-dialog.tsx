@@ -1,7 +1,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { Copy, Download, FolderOpen, Pencil, Save, Trash2, Upload } from "lucide-react";
+import { Copy, Download, FolderOpen, Lock, LockOpen, Pencil, Save, Trash2, Upload } from "lucide-react";
+import { ConfirmAction } from "@/components/confirm-action";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { backupFilename, buildBackup, downloadJson, parseBackup, restoreBackup } from "@/lib/backup";
 import { formatKm } from "@/lib/format";
+import { countDroppedOptions, formatBytes, freezeSnapshot, jsonBytes } from "@/lib/freeze";
 import { newId } from "@/lib/geo";
 import {
   buildSavedTrip,
@@ -105,6 +107,29 @@ function TripLibraryDialog({ onOpenChange }: { onOpenChange: (open: boolean) => 
     await deleteSavedTrip(trip.id);
     if (state.activeSavedId === trip.id) state.setActiveSaved(null, null);
     await refresh();
+  };
+
+  /** Figer : une géométrie par tronçon, puis mise à jour du circuit enregistré s'il y en a un. */
+  const freeze = async () => {
+    state.freezeItinerary();
+    const next = useTripStore.getState();
+    if (next.activeSavedId) {
+      const trip = buildSavedTrip(next.activeSavedName ?? name, currentSnapshot(next), next.activeSavedId, next.marks, next.config);
+      await putSavedTrip(trip);
+      await refresh();
+    }
+    setStatus("Itinéraire figé : une seule route par tronçon, mode Voyager par défaut.");
+  };
+
+  const unfreeze = async () => {
+    state.unfreezeItinerary();
+    const next = useTripStore.getState();
+    if (next.activeSavedId) {
+      const trip = buildSavedTrip(next.activeSavedName ?? name, currentSnapshot(next), next.activeSavedId, next.marks, next.config);
+      await putSavedTrip(trip);
+      await refresh();
+    }
+    setStatus("Itinéraire rouvert à la planification.");
   };
 
   const exportAll = async () => {
@@ -250,6 +275,43 @@ function TripLibraryDialog({ onOpenChange }: { onOpenChange: (open: boolean) => 
             );
           })}
         </ul>
+
+        <div className="flex flex-col gap-1.5 border-t pt-3">
+          <p className="text-xs font-medium">Itinéraire</p>
+          {state.frozenAt ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Figé le {new Date(state.frozenAt).toLocaleDateString("fr-FR")} : une route par tronçon, l’app s’ouvre en
+                mode Voyager.
+              </p>
+              <Button variant="outline" size="sm" className="w-fit" onClick={() => void unfreeze()}>
+                <LockOpen className="size-3.5" />
+                Rouvrir à la planification
+              </Button>
+            </>
+          ) : (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Une fois le circuit arrêté, figer ne garde que la route choisie par tronçon
+                {countDroppedOptions(snapshot.legs) > 0
+                  ? ` (${countDroppedOptions(snapshot.legs)} alternative${countDroppedOptions(snapshot.legs) > 1 ? "s" : ""} retirée${countDroppedOptions(snapshot.legs) > 1 ? "s" : ""}, ${formatBytes(jsonBytes(snapshot))} → ${formatBytes(jsonBytes(freezeSnapshot(snapshot)))})`
+                  : ""}
+                .
+              </p>
+              <ConfirmAction
+                variant="outline"
+                size="sm"
+                className="w-fit"
+                icon={<Lock className="size-3.5" />}
+                label="Figer l’itinéraire"
+                question="Retirer les routes alternatives ?"
+                confirmLabel="Figer"
+                disabled={snapshot.legs.length === 0}
+                onConfirm={freeze}
+              />
+            </>
+          )}
+        </div>
 
         <div className="flex flex-col gap-1.5 border-t pt-3">
           <p className="text-xs font-medium">Sauvegarde</p>

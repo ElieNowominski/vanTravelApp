@@ -4,6 +4,7 @@ import { idbStorage } from "@/lib/idb-storage";
 import { buildCatalog, findCatalogPlace, placeToInput } from "@/lib/catalog";
 import { DEFAULT_VEHICLE, START_STOP_ID, STORAGE_KEY } from "@/lib/constants";
 import { eachDateInclusive, formatDayLabel } from "@/lib/format";
+import { freezeSnapshot } from "@/lib/freeze";
 import { newId } from "@/lib/geo";
 import { normalizeStops } from "@/lib/stop-activities";
 import { configFromSnapshot, isTripConfig, tripDates } from "@/lib/trip-config";
@@ -40,7 +41,10 @@ export type TripState = {
   activeSavedId: string | null;
   activeSavedName: string | null;
   marks: TripMark[];
+  frozenAt: string | null;
   setTripConfig: (config: TripConfig, options?: { reset?: boolean }) => void;
+  freezeItinerary: () => void;
+  unfreezeItinerary: () => void;
   addPlace: (place: PlaceInput) => Promise<void>;
   removeStop: (stopId: string) => Promise<void>;
   markOvernight: (stopId: string) => void;
@@ -119,6 +123,7 @@ function initialTrip(config: TripConfig | null) {
     activeSavedId: null as string | null,
     activeSavedName: null as string | null,
     marks: [] as TripMark[],
+    frozenAt: null as string | null,
   };
 }
 
@@ -178,6 +183,15 @@ export const useTripStore = create<TripState>()(
           return { ...initialTrip(config), layers: prev.layers, marks: prev.marks };
         });
       },
+
+      freezeItinerary: () => {
+        set((prev) => {
+          const frozen = freezeSnapshot(currentSnapshot(prev));
+          return { legs: frozen.legs, frozenAt: frozen.frozenAt ?? null, pendingLegId: null };
+        });
+      },
+
+      unfreezeItinerary: () => set({ frozenAt: null }),
 
       addPlace: async (place) => {
         const state = get();
@@ -432,6 +446,7 @@ export const useTripStore = create<TripState>()(
           activeSavedId: trip.id,
           activeSavedName: trip.name,
           marks: normalizeMarks(trip.marks),
+          frozenAt: typeof trip.frozenAt === "string" ? trip.frozenAt : null,
           pinMode: false,
           pendingLegId: null,
           routingStatus: "idle",
@@ -505,6 +520,7 @@ export const useTripStore = create<TripState>()(
         activeSavedId: state.activeSavedId,
         activeSavedName: state.activeSavedName,
         marks: state.marks,
+        frozenAt: state.frozenAt,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<TripState>;
@@ -512,6 +528,7 @@ export const useTripStore = create<TripState>()(
           ...current,
           ...p,
           config: isTripConfig(p.config) ? p.config : null,
+          frozenAt: typeof p.frozenAt === "string" ? p.frozenAt : null,
           layers: { ...initialLayers, ...(p.layers ?? {}) },
           marks: normalizeMarks(p.marks),
           stops: normalizeStops(p.stops ?? current.stops),
@@ -534,6 +551,7 @@ export function currentSnapshot(state: {
   legs: Leg[];
   customPins: PlaceInput[];
   currentDayIndex: number;
+  frozenAt?: string | null;
 }): TripSnapshot {
   return {
     days: state.days,
@@ -541,6 +559,7 @@ export function currentSnapshot(state: {
     legs: state.legs,
     customPins: state.customPins,
     currentDayIndex: state.currentDayIndex,
+    frozenAt: state.frozenAt ?? null,
   };
 }
 

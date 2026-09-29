@@ -7,6 +7,7 @@ import {
   Download,
   MapPin,
   Footprints,
+  Lock,
   Moon,
   RotateCcw,
   Route,
@@ -18,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { InstallButton } from "@/components/install-button";
 import { TripLibraryButton } from "@/components/trip-library-dialog";
 import { TripMarksEditor } from "@/components/trip-marks-editor";
 import { StopActivitiesEditor } from "@/components/stop-activities-editor";
@@ -55,6 +57,7 @@ export function ItineraryPanel() {
   const addStopActivity = useTripStore((s) => s.addStopActivity);
   const removeStopActivity = useTripStore((s) => s.removeStopActivity);
   const config = useTripStore((s) => s.config);
+  const frozenAt = useTripStore((s) => s.frozenAt);
   const catalog = useMemo(() => buildCatalog(config), [config]);
   const region = getRegion(config?.regionId);
   const vehicle = config?.vehicle ?? DEFAULT_VEHICLE;
@@ -102,6 +105,12 @@ export function ItineraryPanel() {
           <Badge variant="secondary">{formatKm(totals.km)}</Badge>
           <Badge variant="secondary">{formatDuration(totals.sec)}</Badge>
           <Badge variant="secondary">{totals.nights} nuits posées</Badge>
+          {frozenAt && (
+            <Badge variant="outline" title={`Itinéraire figé le ${new Date(frozenAt).toLocaleDateString("fr-FR")}`}>
+              <Lock className="size-3" />
+              Figé
+            </Badge>
+          )}
         </div>
         <div className="mt-3 flex gap-2">
           <Button
@@ -156,6 +165,7 @@ export function ItineraryPanel() {
             {loadingPlan ? "Plan…" : "Plan"}
           </Button>
           <TripLibraryButton />
+          <InstallButton />
           <Link
             to="/comparer"
             className={cn(buttonVariants({ variant: "outline", size: "icon-sm" }))}
