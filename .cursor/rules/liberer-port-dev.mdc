@@ -1,0 +1,31 @@
+---
+description: Libérer le port 43217 après tests pour que l’utilisateur puisse relancer l’app
+alwaysApply: true
+---
+
+# Libérer le port de dev
+
+L’app tourne sur **43217** (`npm run dev`). L’utilisateur teste dans **son** navigateur. Ne pas laisser un serveur agent occuper ce port.
+
+## Après toute vérification (navigateur, curl, PDF, carte)
+
+1. Arrêter **ton** `npm run dev` / process Node sur 43217.
+2. Vérifier que le port est libre.
+3. Ne pas le relancer « pour plus tard ».
+
+Windows :
+
+```powershell
+Get-NetTCPConnection -LocalPort 43217 -ErrorAction SilentlyContinue |
+  Select-Object -ExpandProperty OwningProcess -Unique |
+  ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+```
+
+## Pendant le travail
+
+- Si le port est déjà pris, **ne pas tuer** le serveur de l’utilisateur. Tester via ce process, ou sauter le navigateur.
+- Ne démarre `npm run dev` que si 43217 est libre **et** qu’un test le exige.
+- Quand tu as fini de tester : libérer 43217 **avant** de répondre.
+
+❌ Laisser `next dev` tourner après un test.
+✅ Port 43217 libre pour `npm run dev` côté utilisateur.

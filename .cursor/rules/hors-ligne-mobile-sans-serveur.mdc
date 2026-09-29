@@ -1,0 +1,32 @@
+---
+description: Contraintes techniques de l'app : statique sans serveur, hors ligne d'abord, mobile d'abord, socle multi-voyage
+alwaysApply: true
+---
+
+# Hors ligne, mobile, sans serveur
+
+## Sans serveur
+
+- Aucune route API, aucune fonction serveur, aucun secret au runtime. L'app est un bundle statique (`vite build`).
+- Tout appel externe (OSRM, plus tard GitHub et Google) vit dans `src/services`, a un timeout, un fallback et un état d'erreur visible.
+- Les jeux de données externes (DOC, OSM) sont produits par `scripts/fetch-datasets.mjs` (local et GitHub Action) et servis en statique, jamais interrogés au runtime.
+
+## Hors ligne d'abord
+
+- IndexedDB est la source de vérité locale. Lire local d'abord, synchroniser ensuite.
+- Toute écriture hors ligne est mise en file et rejouée au retour du réseau. Ne jamais perdre une saisie faute de réseau.
+- Chaque nouvelle fonctionnalité du mode Voyager est testée avec le réseau coupé (DevTools > Network > Offline) avant d'être considérée terminée.
+- Pas de préchargement de tuiles `tile.openstreetmap.org` : seules les tuiles déjà affichées restent en cache (Workbox `CacheFirst`, voir `vite.config.ts`). La navigation hors ligne passe par des liens vers Google Maps ou Apple Plans.
+
+## Mobile d'abord
+
+- Vérifier chaque écran à 390 px de large et en mode installé (PWA).
+- Cibles tactiles de 44 px minimum, safe areas respectées (`env(safe-area-inset-*)`), pas de survol comme seul mode d'interaction.
+- Pas de `window.confirm`, `alert`, `prompt` : confirmation intégrée à l'interface. (Reste à purger dans `itinerary-panel.tsx` et `trip-library-dialog.tsx`, phase 4.)
+- Les popups carte deviennent des composants React, pas des chaînes HTML (phase 4).
+
+## Socle réutilisable
+
+- Rien n'est câblé pour un voyage donné : dates, point de départ, bbox, véhicule, hébergements viennent de `TripConfig` ; le cadre carte et le fuseau viennent de `src/data/regions/<id>.json` ; le catalogue public de `src/data/catalog/<region>/`.
+- Le schéma stocké porte `schemaVersion`. Tout changement de forme s'accompagne d'une migration dans `src/lib` et d'un test Vitest.
+- La logique métier vit dans `src/lib`, pure et testée ; les composants n'hébergent pas de calcul.

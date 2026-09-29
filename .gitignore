@@ -1,0 +1,24 @@
+# dépendances et sorties
+node_modules
+dist
+dev-dist
+coverage
+*.tsbuildinfo
+*.log
+
+# jeux de données générés (npm run data) : regénérés au build
+public/data/generated/
+
+# secrets et données personnelles : jamais ici
+.env
+.env.*
+!.env.example
+private/
+
+# éditeurs et OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+
+# worker MapLibre copié depuis node_modules (scripts/copy-maplibre-worker.mjs)
+public/maplibre/

@@ -1,0 +1,30 @@
+---
+description: Aucune donnée personnelle ni secret dans le dépôt public ; où vont les données perso et comment on les manipule
+alwaysApply: true
+---
+
+# Données personnelles et sécurité
+
+Ce dépôt est **public** (GitHub Pages). Tout ce qui y est commité, historique compris, est lisible par n'importe qui.
+
+## Interdit dans ce dépôt
+
+- Voyages (`trip.json`), réservations, codes d'accès, numéros de confirmation, adresses des nuits, dates précises du voyage, dépenses, photos ou PDF de confirmation.
+- Tokens, clés API, phrases secrètes, fichiers `.env*` (sauf `.env.example`).
+- URL de remote git contenant un token.
+- Les fichiers de `public/data/generated/` (données publiques mais volumineuses, regénérées au build) et tout dossier `private/`.
+
+## Où vont les données perso
+
+- Dépôt GitHub **privé** `vanTravel`, dossier `trips/` (`index.json`, `<id>/trip.json`). Plus tard : lu et écrit depuis l'app via l'API GitHub avec un token à portée fine (un seul dépôt, permission contenu) stocké sur l'appareil.
+- En développement : Vite sert ce dépôt sous `/__private/` depuis `PRIVATE_DATA_DIR` (défaut `../vanTravel`). Ne jamais copier ces fichiers dans `public/` ni dans `src/data/`.
+
+## Avant tout push
+
+1. `git remote -v` ne montre aucun token.
+2. `git diff --cached --name-only` ne contient aucun fichier de `trips/`, de `private/` ni de `.env`.
+3. Aucune chaîne ressemblant à un code de réservation, un token (`ghp_`, `github_pat_`) ou une clé API dans le diff.
+
+## Clés API tolérées côté client
+
+Uniquement des clés conçues pour le navigateur et restreintes par référent HTTP au domaine Pages (Google Maps Platform). Jamais de clé OpenRouteService ni de token GitHub dans le bundle.

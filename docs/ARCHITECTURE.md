@@ -1,0 +1,58 @@
+# Architecture
+
+Décisions prises le 29 septembre 2026. Ce document est la référence : quand le code et ce document divergent, on met l'un ou l'autre à jour dans la même PR.
+
+## Contexte
+
+Application personnelle pour deux personnes, utilisée sur téléphone et sur PC, pendant un roadtrip en van. L'itinéraire est figé : l'usage principal devient le suivi étape par étape (réservations, codes, documents, checklists, dépenses). Le socle de planification (carte, calques, tracés, comparaison) est conservé pour un prochain voyage.
+
+Contraintes : aucun coût récurrent, fonctionnement hors ligne, données personnelles jamais exposées publiquement.
+
+## Dépôts
+
+| Dépôt | Visibilité | Contenu |
+| --- | --- | --- |
+| `vanTravelApp` (celui-ci) | public | Application Vite, catalogue générique, préréglages de région, workflow Pages |
+| `vanTravel` | privé | `trips/index.json`, `trips/<id>/trip.json` (voyages), à venir réservations, documents, dépenses. Contient aussi l'ancienne version Next.js en archive |
+
+## Décisions
+
+| Sujet | Décision | Alternatives écartées |
+| --- | --- | --- |
+| Framework | Vite + React + TypeScript, SPA statique | Next.js en export statique (basePath, service worker moins direct, migration de toute façon nécessaire pour retirer les routes API) |
+| Hébergement | GitHub Pages depuis le dépôt public, déploiement par GitHub Actions, `404.html` = SPA | Vercel, Netlify (comptes et quotas en plus, sans gain) |
+| Données personnelles | Dépôt GitHub **privé**, lu et écrit depuis l'app via l'API Contents avec un token à portée fine par personne | Gist secret (pas de binaire propre pour les documents), fichiers injectés au build (publics au runtime), base de données gratuite (pause après inactivité, compte tiers) |
+| Identité | Un compte GitHub par personne, collaboratrice sur le dépôt privé ; profil local (prénom, couleur) ; `updatedBy` sur chaque entité | Système de comptes maison (exige un serveur) |
+| Stockage local | IndexedDB pour la bibliothèque **et** le brouillon zustand (`idb-storage.ts`) ; localStorage seulement en repli | localStorage seul (5 Mo, synchrone) |
+| Synchronisation | Dernière écriture gagne par entité (`updatedAt`), verrou optimiste via le `sha` de l'API GitHub, file d'attente hors ligne | CRDT (surdimensionné pour deux personnes) |
+| Chiffrement | Optionnel, prévu en v2 : enveloppe `secure` chiffrée côté client (WebCrypto AES-GCM) pour les codes d'accès | Chiffrer tout dès la v1 |
+| Hors ligne | vite-plugin-pwa : précache de l'app, des polices, du catalogue et des jeux de données ; runtime cache pour les tuiles déjà vues | Préchargement de tuiles OSM (interdit par la politique d'usage) |
+| Carte hors ligne | Liens vers Google Maps et Apple Plans pour la navigation ; tracés stockés avec l'itinéraire donc visibles hors ligne | Tuiles vectorielles auto-hébergées (à réévaluer si besoin réel) |
+| Données externes | DOC et OSM téléchargés par `scripts/fetch-datasets.mjs` (local et GitHub Action) et servis en statique | Appels Overpass et ArcGIS au runtime (CORS, latence, indisponibles hors ligne) |
+| Routage | OSRM public depuis le navigateur, dans la limite de sa politique ; estimation en fallback ; aucune clé ORS dans le bundle | Routage serveur |
+| Roadbook | Route imprimable en HTML avec `@media print` (phase 4) | jsPDF (conservé provisoirement pour la parité) |
+| Google | Places API (New) avec clé restreinte par référent HTTP, à la planification, résultats stockés dans les données | Appels Google au runtime en voyage |
+
+## Modèle
+
+`TripConfig` (`src/lib/types.ts`) : identité du voyage, région, dates de début et fin, arrivée optionnelle, véhicule, hébergements privés, plan. Tout ce qui était en constantes (dates, Christchurch, bbox, van) en dérive. Le store (`src/store/trip-store.ts`) porte `config`; les jours sont générés à partir des dates ; le catalogue affiché est `buildCatalog(config)` = catalogue public de la région + `config.stays`.
+
+Un `SavedTrip` embarque son `config`. Les circuits de l'ancienne version n'en ont pas : `configFromSnapshot` en dérive un (dates des jours, première étape comme départ, étapes « camp » comme hébergements).
+
+À venir (phase 4), par étape : `bookings[]`, `documents[]`, `checklist[]`, `notes` ; par jour : `notes`, `expenses[]`. Chaque entité porte `id`, `updatedAt`, `updatedBy`. Le schéma est versionné (`schemaVersion`) ; toute évolution s'accompagne d'une migration testée.
+
+## Flux des données au démarrage
+
+1. Réhydratation du brouillon (localStorage).
+2. Sans voyage chargé, en dev : lecture de `/__private/trips/index.json` puis du premier `trip.json` (plugin Vite `privateDataPlugin`).
+3. Toujours sans voyage : écran de démarrage (`TripSetupScreen`) : importer une sauvegarde, rouvrir un circuit de la bibliothèque, créer un voyage neuf.
+4. Phase 5 : lecture du dépôt privé via l'API GitHub avec le token de l'appareil.
+
+## Phases
+
+1. Hygiène : token révoqué, sauvegarde export et import, lint propre. **Fait.**
+2. Statique : entité `Trip`, migration Vite, suppression des routes API, données générées au build, déploiement Pages, PWA de base. **Fait dans ce dépôt.**
+3. Hors ligne : bandeau d'état réseau, invite d'installation, allègement du stockage (une seule géométrie par tronçon une fois l'itinéraire figé).
+4. Mode Voyager : réservations, documents, checklists, dépenses, écran « Aujourd'hui », roadbook imprimable, refonte mobile, suppression de `window.confirm`.
+5. Synchronisation : dépôt privé via API GitHub, token par personne, fusion, file hors ligne.
+6. Socle multi-voyage et enrichissement Google.
