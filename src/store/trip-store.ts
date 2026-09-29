@@ -6,7 +6,8 @@ import { DEFAULT_VEHICLE, START_STOP_ID, STORAGE_KEY } from "@/lib/constants";
 import { eachDateInclusive, formatDayLabel } from "@/lib/format";
 import { freezeSnapshot } from "@/lib/freeze";
 import { newId } from "@/lib/geo";
-import { normalizeStops } from "@/lib/stop-activities";
+import { SNAPSHOT_SCHEMA_VERSION, normalizeDays, normalizeStops } from "@/lib/migrations";
+import { createTravelSlice, type TravelSlice } from "@/store/travel-slice";
 import { configFromSnapshot, isTripConfig, tripDates } from "@/lib/trip-config";
 import { normalizeMarks } from "@/lib/trip-marks";
 import type {
@@ -25,7 +26,7 @@ import type {
 } from "@/lib/types";
 import { routeBetween } from "@/services/routing";
 
-export type TripState = {
+export type TripState = TravelSlice & {
   /** Le voyage courant (dates, départ, véhicule, hébergements). `null` : rien de chargé. */
   config: TripConfig | null;
   days: TripDay[];
@@ -78,8 +79,14 @@ function emptyDays(config: TripConfig | null): TripDay[] {
       locked: false,
       overnightStopId: null,
       stopIds: [],
+      expenses: [],
     };
   });
+}
+
+/** Tableaux Voyager vides d'une étape neuve. */
+function emptyStopExtras(): Pick<Stop, "activities" | "bookings" | "documents" | "checklist"> {
+  return { activities: [], bookings: [], documents: [], checklist: [] };
 }
 
 function seedStart(config: TripConfig | null): { days: TripDay[]; stops: Record<string, Stop> } {
@@ -92,7 +99,7 @@ function seedStart(config: TripConfig | null): { days: TripDay[]; stops: Record<
     id: START_STOP_ID,
     isOvernight: false,
     notes: config.start.notes ?? place.notes,
-    activities: [],
+    ...emptyStopExtras(),
   };
   days[0].stopIds = [stop.id];
   return { days, stops: { [stop.id]: stop } };
@@ -175,6 +182,7 @@ export const useTripStore = create<TripState>()(
   persist(
     (set, get) => ({
       ...initialTrip(null),
+      ...createTravelSlice(set),
 
       setTripConfig: (config, options = {}) => {
         set((prev) => {
@@ -208,7 +216,7 @@ export const useTripStore = create<TripState>()(
           ...place,
           id: newId("stop"),
           isOvernight: false,
-          activities: [],
+          ...emptyStopExtras(),
         };
 
         set((prev) => {
@@ -438,7 +446,7 @@ export const useTripStore = create<TripState>()(
           config: isTripConfig(trip.config)
             ? trip.config
             : configFromSnapshot(trip, { name: trip.name }) ?? prev.config,
-          days: structuredClone(trip.days),
+          days: normalizeDays(structuredClone(trip.days)),
           stops: normalizeStops(structuredClone(trip.stops)),
           legs: structuredClone(trip.legs),
           customPins: structuredClone(trip.customPins ?? []),
@@ -509,6 +517,9 @@ export const useTripStore = create<TripState>()(
       // IndexedDB : un circuit avec ses tracés dépasse le quota localStorage.
       storage: createJSONStorage(() => idbStorage),
       skipHydration: true,
+      // La forme est versionnée ; `merge` normalise quelle que soit la version lue (voir src/lib/migrations.ts).
+      version: SNAPSHOT_SCHEMA_VERSION,
+      migrate: (persisted) => persisted as TripState,
       partialize: (state) => ({
         config: state.config,
         days: state.days,
@@ -521,6 +532,7 @@ export const useTripStore = create<TripState>()(
         activeSavedName: state.activeSavedName,
         marks: state.marks,
         frozenAt: state.frozenAt,
+        uiMode: state.uiMode,
       }),
       merge: (persisted, current) => {
         const p = (persisted ?? {}) as Partial<TripState>;
@@ -529,10 +541,11 @@ export const useTripStore = create<TripState>()(
           ...p,
           config: isTripConfig(p.config) ? p.config : null,
           frozenAt: typeof p.frozenAt === "string" ? p.frozenAt : null,
+          uiMode: p.uiMode === "plan" || p.uiMode === "travel" ? p.uiMode : null,
           layers: { ...initialLayers, ...(p.layers ?? {}) },
           marks: normalizeMarks(p.marks),
           stops: normalizeStops(p.stops ?? current.stops),
-          days: Array.isArray(p.days) ? p.days : [],
+          days: normalizeDays(p.days),
           legs: Array.isArray(p.legs) ? p.legs : [],
           customPins: Array.isArray(p.customPins) ? p.customPins : [],
         };

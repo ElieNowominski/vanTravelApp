@@ -1,6 +1,6 @@
 # vanTravel
 
-Application personnelle de roadtrip en van, pour deux personnes, sur téléphone et sur PC. Deux modes : **Planifier** (carte, catalogue de villes et de spots, campings DOC et OSM, tracés routiers, comparaison de circuits) et, à venir, **Voyager** (étape par étape : réservations, codes, documents, checklists, dépenses, hors ligne).
+Application personnelle de roadtrip en van, pour deux personnes, sur téléphone et sur PC. Deux modes : **Planifier** (carte, catalogue de villes et de spots, campings DOC et OSM, tracés routiers, comparaison de circuits) et **Voyager** (écran « Aujourd'hui », nuit du soir avec référence et code, réservations, photos et PDF, checklists, notes, journal des dépenses, roadbook imprimable ; tout marche hors ligne). Voyager s'ouvre par défaut pendant le voyage ou une fois l'itinéraire figé ; la bascule est dans l'en-tête.
 
 Site statique déployé sur GitHub Pages, installable comme PWA. Aucun serveur, aucune base de données.
 
@@ -11,7 +11,7 @@ Site statique déployé sur GitHub Pages, installable comme PWA. Aucun serveur, 
 | Ce dépôt (public) | Code, catalogue générique par région (`src/data/catalog/`), préréglages de région (`src/data/regions/`) |
 | `public/data/generated/` (ignoré par git) | Campings DOC, aires OSM, freedom camping : produits par `npm run data`, régénérés par le workflow |
 | Dépôt **privé** `vanTravel` | Les voyages : `trips/index.json` et `trips/<id>/trip.json` (dates, véhicule, hébergements réservés, plan). Plus tard réservations, codes, documents |
-| Le navigateur | Circuit courant (localStorage), bibliothèque de circuits (IndexedDB) |
+| Le navigateur | Circuit courant, bibliothèque de circuits, réservations, checklists, dépenses, contenu des documents, profil (IndexedDB, par appareil) |
 
 Rien de personnel n'entre dans ce dépôt : voir `.cursor/rules/donnees-perso-et-securite.mdc`.
 
@@ -59,7 +59,7 @@ En développement, Vite sert le dépôt privé sous `/__private/` depuis le doss
 
 ## Sauvegarde et migration depuis l'ancienne version
 
-La bibliothèque (icône dossier) exporte un JSON avec le circuit affiché et tous les circuits enregistrés, tracés compris. L'import fusionne sans écraser ce qui est plus récent. Le fichier produit par le snippet console de l'ancienne version (Next.js) est accepté tel quel : les circuits sans voyage en reçoivent un, dérivé de leurs dates et de leurs étapes.
+La bibliothèque (icône dossier) exporte un JSON avec le circuit affiché, tous les circuits enregistrés (tracés compris) et le contenu des documents. L'import fusionne sans écraser ce qui est plus récent. Tant que la synchronisation (phase 5) n'existe pas, c'est le seul pont entre deux appareils. Le fichier produit par le snippet console de l'ancienne version (Next.js) est accepté tel quel : les circuits sans voyage en reçoivent un, dérivé de leurs dates et de leurs étapes.
 
 ## Déploiement
 

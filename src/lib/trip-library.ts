@@ -1,6 +1,6 @@
 import { TRIP_LIBRARY_DB, TRIP_LIBRARY_LS, TRIP_LIBRARY_STORE } from "@/lib/constants";
 import { newId } from "@/lib/geo";
-import { normalizeStops } from "@/lib/stop-activities";
+import { SNAPSHOT_SCHEMA_VERSION, migrateSnapshot } from "@/lib/migrations";
 import { isTripConfig } from "@/lib/trip-config";
 import { normalizeMarks } from "@/lib/trip-marks";
 import type { SavedTrip, TripConfig, TripMark, TripSnapshot } from "@/lib/types";
@@ -44,6 +44,7 @@ export function buildSavedTrip(
   const stats = snapshotStats(snapshot);
   return {
     id,
+    schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     name: name.trim() || suggestTripName(snapshot),
     savedAt: new Date().toISOString(),
     km: stats.km,
@@ -88,10 +89,8 @@ export async function deleteSavedTrip(id: string): Promise<void> {
 
 function hydrateTrip(trip: SavedTrip): SavedTrip {
   return {
-    ...trip,
+    ...migrateSnapshot(trip),
     marks: normalizeMarks(trip.marks),
-    stops: normalizeStops(trip.stops),
-    customPins: Array.isArray(trip.customPins) ? trip.customPins : [],
     config: isTripConfig(trip.config) ? trip.config : null,
   };
 }

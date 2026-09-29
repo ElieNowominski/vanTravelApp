@@ -79,3 +79,32 @@ describe("parseBackup", () => {
     expect(() => parseBackup("{ pas du json")).toThrow(/JSON/);
   });
 });
+
+describe("documents dans la sauvegarde (v3)", () => {
+  it("ne garde que des data URL et tolère l'absence du champ", () => {
+    const base = {
+      app: "vantravel",
+      version: 3,
+      exportedAt: "2026-09-29T10:00:00.000Z",
+      draft: { days: [day], stops: { s1: stop }, legs: [], customPins: [], currentDayIndex: 0, marks: [] },
+      savedTrips: [],
+    };
+    expect(parseBackup(JSON.stringify(base)).documents).toEqual({});
+    const withDocs = parseBackup(
+      JSON.stringify({ ...base, documents: { "doc-1": "data:image/jpeg;base64,AAAA", "doc-2": "http://ailleurs", "doc-3": 12 } }),
+    );
+    expect(withDocs.documents).toEqual({ "doc-1": "data:image/jpeg;base64,AAAA" });
+  });
+
+  it("migre les étapes d'une sauvegarde v1 vers la forme Voyager", () => {
+    const backup = parseBackup(
+      JSON.stringify({
+        savedTrips: [{ id: "t", name: "T", savedAt: "2026-01-01T00:00:00.000Z", days: [day], stops: { s1: stop }, legs: [] }],
+      }),
+    );
+    expect(backup.savedTrips[0].stops.s1.bookings).toEqual([]);
+    expect(backup.savedTrips[0].days[0].expenses).toEqual([]);
+    expect(backup.savedTrips[0].schemaVersion).toBe(2);
+    expect(backup.draft).toBeNull();
+  });
+});

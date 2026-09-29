@@ -79,10 +79,6 @@ function TripLibraryDialog({ onOpenChange }: { onOpenChange: (open: boolean) => 
   };
 
   const openTrip = (trip: SavedTrip) => {
-    if (state.activeSavedId !== trip.id) {
-      const ok = window.confirm("Le circuit affiché sera remplacé. Enregistre-le avant si besoin.");
-      if (!ok) return;
-    }
     state.loadSavedTrip(trip);
     onOpenChange(false);
   };
@@ -103,7 +99,6 @@ function TripLibraryDialog({ onOpenChange }: { onOpenChange: (open: boolean) => 
   };
 
   const remove = async (trip: SavedTrip) => {
-    if (!window.confirm(`Supprimer « ${trip.name} » ?`)) return;
     await deleteSavedTrip(trip.id);
     if (state.activeSavedId === trip.id) state.setActiveSaved(null, null);
     await refresh();
@@ -159,6 +154,7 @@ function TripLibraryDialog({ onOpenChange }: { onOpenChange: (open: boolean) => 
         report.updated > 0 ? `${report.updated} mis à jour` : null,
         report.skipped > 0 ? `${report.skipped} déjà à jour` : null,
         report.draftSavedAs ? `brouillon enregistré sous « ${report.draftSavedAs} »` : null,
+        report.documents > 0 ? `${report.documents} document${report.documents > 1 ? "s" : ""}` : null,
       ].filter(Boolean);
       setStatus(parts.length > 0 ? `Import terminé : ${parts.join(", ")}.` : "Rien à importer.");
       await refresh();
@@ -246,9 +242,20 @@ function TripLibraryDialog({ onOpenChange }: { onOpenChange: (open: boolean) => 
                       })}
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1">
-                      <Button size="xs" variant="secondary" onClick={() => openTrip(trip)}>
-                        Ouvrir
-                      </Button>
+                      {state.activeSavedId === trip.id ? (
+                        <Button size="xs" variant="secondary" onClick={() => openTrip(trip)}>
+                          Ouvrir
+                        </Button>
+                      ) : (
+                        <ConfirmAction
+                          size="xs"
+                          variant="secondary"
+                          label="Ouvrir"
+                          question="Remplacer le circuit affiché ? (Enregistre-le avant si besoin.)"
+                          confirmLabel="Ouvrir"
+                          onConfirm={() => openTrip(trip)}
+                        />
+                      )}
                       <Button
                         size="xs"
                         variant="ghost"
@@ -264,10 +271,14 @@ function TripLibraryDialog({ onOpenChange }: { onOpenChange: (open: boolean) => 
                         <Copy className="size-3" />
                         Dupliquer
                       </Button>
-                      <Button size="xs" variant="ghost" onClick={() => void remove(trip)}>
-                        <Trash2 className="size-3" />
-                        Supprimer
-                      </Button>
+                      <ConfirmAction
+                        size="xs"
+                        icon={<Trash2 className="size-3" />}
+                        label="Supprimer"
+                        question={`Supprimer « ${trip.name} » ?`}
+                        confirmLabel="Supprimer"
+                        onConfirm={() => remove(trip)}
+                      />
                     </div>
                   </>
                 )}

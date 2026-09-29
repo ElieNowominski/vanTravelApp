@@ -1,12 +1,14 @@
 import { buildSavedTrip, listSavedTrips, putSavedTrip } from "@/lib/trip-library";
 import { configFromSnapshot, isTripConfig } from "@/lib/trip-config";
 import { normalizeMarks } from "@/lib/trip-marks";
-import { normalizeStops } from "@/lib/stop-activities";
+import { migrateSnapshot } from "@/lib/migrations";
+import { blobToDataUrl, dataUrlToBlob, getDocumentBlob, putDocumentBlob } from "@/lib/document-store";
 import type { SavedTrip, TripConfig, TripMark, TripSnapshot } from "@/lib/types";
 import { currentSnapshot, useTripStore } from "@/store/trip-store";
 
 export const BACKUP_APP = "vantravel";
-export const BACKUP_VERSION = 2;
+/** 1 : sans voyage. 2 : avec `config`. 3 : contenu des documents (`documents`, data URL par id). */
+export const BACKUP_VERSION = 3;
 
 export type BackupDraft = TripSnapshot & {
   marks: TripMark[];
@@ -23,6 +25,8 @@ export type BackupFile = {
   draft: BackupDraft | null;
   /** Bibliothèque IndexedDB. */
   savedTrips: SavedTrip[];
+  /** Contenu des photos et PDF, par `TripDocument.id` (data URL). Absent avant la v3. */
+  documents?: Record<string, string>;
 };
 
 export type RestoreReport = {
@@ -34,23 +38,48 @@ export type RestoreReport = {
   draftTrip: SavedTrip | null;
   /** Tous les circuits présents dans le fichier, hydratés d'un voyage. */
   trips: SavedTrip[];
+  /** Documents (photos, PDF) dont le contenu a été ajouté sur cet appareil. */
+  documents: number;
 };
 
 export async function buildBackup(): Promise<BackupFile> {
   const state = useTripStore.getState();
+  const draft = currentSnapshot(state);
+  const savedTrips = await listSavedTrips();
   return {
     app: BACKUP_APP,
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
     draft: {
-      ...currentSnapshot(state),
+      ...draft,
       marks: state.marks,
       activeSavedId: state.activeSavedId,
       activeSavedName: state.activeSavedName,
       config: state.config,
     },
-    savedTrips: await listSavedTrips(),
+    savedTrips,
+    documents: await collectDocumentBlobs([draft, ...savedTrips]),
   };
+}
+
+/** Identifiants de documents référencés par des snapshots, sans doublon. */
+export function documentIdsOf(snapshots: Pick<TripSnapshot, "stops">[]): string[] {
+  const ids = new Set<string>();
+  for (const snapshot of snapshots) {
+    for (const stop of Object.values(snapshot.stops ?? {})) {
+      for (const doc of stop.documents ?? []) ids.add(doc.id);
+    }
+  }
+  return [...ids];
+}
+
+async function collectDocumentBlobs(snapshots: Pick<TripSnapshot, "stops">[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  for (const id of documentIdsOf(snapshots)) {
+    const blob = await getDocumentBlob(id);
+    if (blob) out[id] = await blobToDataUrl(blob);
+  }
+  return out;
 }
 
 export function backupFilename(date = new Date()): string {
@@ -92,12 +121,20 @@ export function parseBackup(raw: string): BackupFile {
     throw new Error("Aucun circuit trouvé dans ce fichier.");
   }
 
+  const documents: Record<string, string> = {};
+  if (isRecord(parsed.documents)) {
+    for (const [id, value] of Object.entries(parsed.documents)) {
+      if (typeof value === "string" && value.startsWith("data:")) documents[id] = value;
+    }
+  }
+
   return {
     app: BACKUP_APP,
     version: typeof parsed.version === "number" ? parsed.version : 1,
     exportedAt: typeof parsed.exportedAt === "string" ? parsed.exportedAt : new Date().toISOString(),
     draft,
     savedTrips,
+    documents,
   };
 }
 
@@ -116,6 +153,7 @@ export async function restoreBackup(backup: BackupFile): Promise<RestoreReport> 
     draftSavedAs: null,
     draftTrip: null,
     trips: [],
+    documents: 0,
   };
 
   for (const raw of backup.savedTrips) {
@@ -153,6 +191,17 @@ export async function restoreBackup(backup: BackupFile): Promise<RestoreReport> 
     report.trips.unshift(trip);
   }
 
+  // Contenu des documents : on n'écrase jamais un blob déjà présent sur cet appareil.
+  for (const [id, dataUrl] of Object.entries(backup.documents ?? {})) {
+    try {
+      if (await getDocumentBlob(id)) continue;
+      await putDocumentBlob(id, await dataUrlToBlob(dataUrl));
+      report.documents += 1;
+    } catch {
+      /* document illisible : les métadonnées restent, la fiche signale l'absence */
+    }
+  }
+
   return report;
 }
 
@@ -162,12 +211,7 @@ function parseDraft(value: unknown): BackupDraft | null {
   const state = isRecord(value.state) ? value.state : value;
   if (!Array.isArray(state.days) || !isRecord(state.stops)) return null;
   return {
-    days: state.days as TripSnapshot["days"],
-    stops: normalizeStops(state.stops as TripSnapshot["stops"]),
-    legs: Array.isArray(state.legs) ? (state.legs as TripSnapshot["legs"]) : [],
-    customPins: Array.isArray(state.customPins) ? (state.customPins as TripSnapshot["customPins"]) : [],
-    currentDayIndex: typeof state.currentDayIndex === "number" ? state.currentDayIndex : 0,
-    frozenAt: typeof state.frozenAt === "string" ? state.frozenAt : null,
+    ...migrateSnapshot(state as Partial<TripSnapshot>),
     marks: normalizeMarks(state.marks as TripMark[] | undefined),
     activeSavedId: typeof state.activeSavedId === "string" ? state.activeSavedId : null,
     activeSavedName: typeof state.activeSavedName === "string" ? state.activeSavedName : null,
@@ -194,11 +238,9 @@ function isSavedTripLike(value: unknown): value is SavedTrip {
 
 function hydrateSavedTrip(trip: SavedTrip): SavedTrip {
   return {
-    ...trip,
+    ...migrateSnapshot(trip),
     savedAt: typeof trip.savedAt === "string" ? trip.savedAt : new Date(0).toISOString(),
-    customPins: Array.isArray(trip.customPins) ? trip.customPins : [],
     marks: normalizeMarks(trip.marks),
-    stops: normalizeStops(trip.stops),
     config: isTripConfig(trip.config) ? trip.config : null,
   };
 }

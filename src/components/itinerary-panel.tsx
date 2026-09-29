@@ -19,7 +19,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import { ConfirmAction } from "@/components/confirm-action";
 import { InstallButton } from "@/components/install-button";
+import { ModeSwitch } from "@/components/mode-switch";
 import { TripLibraryButton } from "@/components/trip-library-dialog";
 import { TripMarksEditor } from "@/components/trip-marks-editor";
 import { StopActivitiesEditor } from "@/components/stop-activities-editor";
@@ -58,6 +60,7 @@ export function ItineraryPanel() {
   const removeStopActivity = useTripStore((s) => s.removeStopActivity);
   const config = useTripStore((s) => s.config);
   const frozenAt = useTripStore((s) => s.frozenAt);
+  const setUiMode = useTripStore((s) => s.setUiMode);
   const catalog = useMemo(() => buildCatalog(config), [config]);
   const region = getRegion(config?.regionId);
   const vehicle = config?.vehicle ?? DEFAULT_VEHICLE;
@@ -85,13 +88,18 @@ export function ItineraryPanel() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header className="border-b px-4 py-3">
-        <p className="text-xs tracking-wide text-muted-foreground uppercase">
-          {region.name}
-          {config ? ` · ${formatDateRange(config.start.date, config.end.date)}` : ""}
-        </p>
-        <h1 className="font-heading text-lg leading-tight">
-          {activeSavedName || config?.name || "Roadtrip van"}
-        </h1>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-xs tracking-wide text-muted-foreground uppercase">
+              {region.name}
+              {config ? ` · ${formatDateRange(config.start.date, config.end.date)}` : ""}
+            </p>
+            <h1 className="font-heading text-lg leading-tight">
+              {activeSavedName || config?.name || "Roadtrip van"}
+            </h1>
+          </div>
+          <ModeSwitch mode="plan" onChange={(mode) => setUiMode(mode)} />
+        </div>
         <p className="mt-1 text-xs text-muted-foreground">
           {vehicle.name}{vehicle.selfContained ? " · self-contained" : ""} · temps × {vehicle.timeFactor}
         </p>
@@ -147,23 +155,20 @@ export function ItineraryPanel() {
             <Download className="size-3.5" />
             {exporting ? "PDF…" : "PDF"}
           </Button>
-          <Button
+          <ConfirmAction
             variant="outline"
             size="sm"
             disabled={!config || loadingPlan || routingStatus === "loading"}
             title="Remplacer le circuit par le plan catalogue (vrais campings)"
-            onClick={() => {
-              const ok = window.confirm(
-                "Remplacer le circuit affiché par le plan avec les campings réservés ?",
-              );
-              if (!ok) return;
+            icon={<Route className="size-3.5" />}
+            label={loadingPlan ? "Plan…" : "Plan"}
+            question="Remplacer le circuit affiché par le plan du voyage ?"
+            confirmLabel="Remplacer"
+            onConfirm={() => {
               setLoadingPlan(true);
               void loadCatalogPlan().finally(() => setLoadingPlan(false));
             }}
-          >
-            <Route className="size-3.5" />
-            {loadingPlan ? "Plan…" : "Plan"}
-          </Button>
+          />
           <TripLibraryButton />
           <InstallButton />
           <Link

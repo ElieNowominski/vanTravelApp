@@ -21,12 +21,12 @@ Prompt de reprise à coller dans une nouvelle session :
 
 - [x] Phase 1 : hygiène (token révoqué, sauvegarde export et import, lint propre)
 - [x] Phase 2 : Vite, entité `TripConfig`, données au build, PWA de base, GitHub Pages en ligne (29 sept. 2026)
-- [ ] Phase 3 : hors ligne solide (fait le 29 sept. : navigation mobile par onglets Carte / Itinéraire avec geste retour, défilement natif du panneau, revérification horaire des mises à jour du service worker)
-- [ ] Phase 4 : mode Voyager
+- [x] Phase 3 : hors ligne solide (29 sept. 2026 : onglets Carte / Itinéraire avec geste retour, bandeau réseau, bouton d'installation, figeage de l'itinéraire, notice de jeux de données, service worker vérifié sous `/vanTravelApp/` ; test Playwright optionnel non fait)
+- [x] Phase 4 : mode Voyager (29 sept. 2026, branche `phase-4-voyager` : schéma v2 migré et testé, écran « Aujourd'hui », fiches étape, dépenses, roadbook, popups React, `window.confirm` purgé). **Reste à valider sur téléphone à 390 px et réseau coupé** avant la PR ; jsPDF conservé jusque-là.
 - [ ] Phase 5 : synchronisation entre appareils
 - [ ] Phase 6 : socle multi-voyage, Google
 
-Fait savoir : les données sont stockées **par navigateur et par appareil** (IndexedDB). Tant que la phase 5 n'est pas là, le seul pont entre appareils est le fichier de sauvegarde (bibliothèque, boutons Exporter et Importer).
+Fait savoir : les données sont stockées **par navigateur et par appareil** (IndexedDB), y compris les photos et PDF (base `vantravel-docs`, embarqués dans la sauvegarde v3). Tant que la phase 5 n'est pas là, le seul pont entre appareils est le fichier de sauvegarde (bibliothèque, boutons Exporter et Importer).
 
 ## Conventions de travail
 
@@ -40,11 +40,11 @@ Fait savoir : les données sont stockées **par navigateur et par appareil** (In
 
 Objectif : l'app installée sur le téléphone se lance et affiche l'itinéraire sans réseau.
 
-- [ ] Bandeau d'état réseau (hors ligne, synchronisation en attente) et bouton d'installation PWA (`beforeinstallprompt`, guide iOS « Ajouter à l'écran d'accueil »).
-- [ ] Allègement du stockage : quand l'itinéraire est figé, ne garder que la géométrie choisie par tronçon (`Leg.options` réduit à un élément) ; commande « Figer l'itinéraire » dans la bibliothèque.
-- [ ] Écran d'erreur clair quand un jeu de données manque (`loadDataset`) au lieu d'un message dans les calques.
-- [ ] Vérifier le service worker sur Pages : mise à jour silencieuse, `navigateFallback` sous `/vanTravelApp/`, précache des `.geojson`.
-- [ ] Test Playwright minimal (optionnel) : chargement, ouverture d'un circuit de démo, mode hors ligne.
+- [x] Bandeau d'état réseau (`network-banner.tsx` ; la synchro en attente s'y ajoutera en phase 5) et bouton d'installation PWA (`install-button.tsx`, `use-install-prompt.ts`, guide iOS ; contexte calculé dans `src/lib/pwa.ts`, testé).
+- [x] Allègement du stockage : `src/lib/freeze.ts` (testé), `frozenAt` sur le snapshot et le brouillon, commandes « Figer l'itinéraire » et « Rouvrir » dans la bibliothèque avec le gain affiché, badge « Figé » dans le panneau.
+- [x] Notice claire sur la carte quand un jeu de données manque (`dataset-notice.tsx`), fermable et non bloquante : l'itinéraire et les fiches n'en dépendent pas. Les calques ne portent plus d'erreur.
+- [x] Service worker vérifié sur un build `BASE_PATH=/vanTravelApp/` : `navigateFallback` → `/vanTravelApp/index.html`, trois `.geojson` précachés (39 entrées, 4,4 Mo), mise à jour `autoUpdate` (la page se recharge seule à l'arrivée d'une version : à surveiller pendant une saisie).
+- [ ] Test Playwright minimal (optionnel, non fait) : chargement, ouverture d'un circuit de démo, mode hors ligne.
 
 Critère : Lighthouse PWA installable ; en avion, l'itinéraire et les fiches s'ouvrent.
 
@@ -67,13 +67,13 @@ Migration : les circuits existants reçoivent des tableaux vides. Profil local (
 
 ### Écrans
 
-- [ ] Bascule Planifier / Voyager dans l'en-tête ; Voyager par défaut quand la date du jour (fuseau de la région) est dans l'intervalle du voyage ou que l'itinéraire est figé.
-- [ ] « Aujourd'hui » : jour courant, prochaine étape, temps de route, nuit du soir avec référence et code, boutons « Ouvrir dans Google Maps » (`https://www.google.com/maps/dir/?api=1&destination=lat,lng`) et « Appeler » (numéro affiché en clair), météo notée à la main.
-- [ ] Fiche étape : réservations (formulaire), documents (photo ou PDF, compressés côté client à ~300 Ko max), checklist, notes. Champs sensibles masqués par défaut (code d'accès révélé au toucher).
-- [ ] Journal des dépenses : saisie rapide, total par jour et total voyage, qui a payé, répartition entre les deux profils.
-- [ ] Liste des jours en défilement horizontal, cible tactile 44 px, safe areas.
-- [ ] Roadbook imprimable : route `/roadbook` en HTML sémantique, `@media print`, un jour par section, `break-inside: avoid`, image de carte par jour capturée à la demande ; retirer jsPDF quand le roadbook couvre le besoin.
-- [ ] Purger `window.confirm` (panneau itinéraire, bibliothèque) au profit d'une confirmation intégrée ; popups carte en composants React.
+- [x] Bascule Planifier / Voyager dans l'en-tête (`mode-switch.tsx`) ; défaut calculé par `defaultMode` (`src/lib/voyager.ts`, testé) : Voyager pendant le voyage dans le fuseau de la région ou si l'itinéraire est figé ; choix explicite persisté (`uiMode`).
+- [x] « Aujourd'hui » (`voyager/today-card.tsx`, `summarizeDay` testé) : jour courant, départ → nuit, prochaine étape, temps de route van, nuit du soir avec référence et code masqué (`secret-field.tsx`), Google Maps et Appeler (numéro en clair), météo et notes du jour.
+- [x] Fiche étape (`voyager/stop-sheet.tsx`, panneau bas) : réservations (formulaire et cartes), documents (photo ou PDF ; JPEG recompressé vers ~300 Ko par `image-compress.ts`, contenu dans IndexedDB `vantravel-docs`), checklist, notes. Code d'accès masqué, révélé au toucher, re-masqué après 20 s.
+- [x] Journal des dépenses (`voyager/expenses-panel.tsx`, `src/lib/expenses.ts` testé) : saisie rapide en devise de la région, total du jour et du voyage par devise, par payeur, par catégorie, qui doit combien à qui (parts égales). Profil local (prénom, couleur, prénom de l'autre) dans `profile-store.ts`.
+- [x] Liste des jours en défilement horizontal (`voyager/day-strip.tsx`, cibles 56 × 60 px, jour courant marqué), safe areas haut et bas.
+- [x] Roadbook imprimable (`roadbook/roadbook-page.tsx`, route `/roadbook`) : HTML sémantique, `@media print`, un jour par section avec `break-inside: avoid`, codes d'accès exclus par défaut. **Écart au plan** : au lieu d'une capture de tuiles par jour, un croquis SVG du tracé stocké (`src/lib/route-sketch.ts`, testé) : hors ligne, imprimable, sans tuile OSM. jsPDF reste jusqu'à validation du roadbook sur le téléphone.
+- [x] `window.confirm` purgé (`ConfirmAction` : Plan, ouverture et suppression d'un circuit, figeage, suppressions Voyager) ; popups carte en React (`map-popup.tsx`, `react-popup.ts`, carte de comparaison incluse).
 
 Critère : en voyage, sans réseau, on retrouve en trois touches la nuit du soir, son code et l'itinéraire vers elle.
 

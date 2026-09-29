@@ -27,7 +27,7 @@ const leg: Leg = {
 };
 
 const snapshot: TripSnapshot = {
-  days: [{ date: "2027-02-07", label: "7 févr.", weekday: "Dim", locked: true, overnightStopId: "s2", stopIds: ["s1", "s2"] }],
+  days: [{ date: "2027-02-07", label: "7 févr.", weekday: "Dim", locked: true, overnightStopId: "s2", stopIds: ["s1", "s2"], expenses: [] }],
   stops: {},
   legs: [leg, { ...leg, id: "leg-2", options: [option("D", 200)], selectedIndex: 0 }],
   customPins: [],

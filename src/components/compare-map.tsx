@@ -4,6 +4,7 @@ import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Popup } from "ma
 import { MAP_MAX_ZOOM, MAP_MIN_ZOOM, buildMapStyle } from "@/lib/constants";
 import { absoluteAssetUrl } from "@/lib/base-url";
 import { getRegion } from "@/lib/regions";
+import { showReactPopup } from "@/components/react-popup";
 import { useTripStore } from "@/store/trip-store";
 import { boundsFromFeatures, tripRouteFeatures } from "@/lib/compare";
 import type { SavedTrip } from "@/lib/types";
@@ -120,10 +121,20 @@ export function CompareMap({ trips, colors }: { trips: SavedTrip[]; colors: stri
           return;
         }
         const props = hit.properties ?? {};
-        const html = `<p class="text-xs font-medium">${escapeHtml(String(props.tripName ?? ""))}</p>
-          <p class="text-sm">${escapeHtml(String(props.name ?? ""))}</p>
-          <p class="text-xs opacity-70">${escapeHtml(String(props.dayLabel ?? ""))}${props.overnight ? " · nuit" : ""}</p>`;
-        popupRef.current?.setLngLat(event.lngLat).setHTML(html).addTo(map);
+        if (!popupRef.current) return;
+        showReactPopup(
+          popupRef.current,
+          map,
+          event.lngLat,
+          <div className="p-3 text-foreground">
+            <p className="text-xs font-medium">{String(props.tripName ?? "")}</p>
+            <p className="text-sm">{String(props.name ?? "")}</p>
+            <p className="text-xs opacity-70">
+              {String(props.dayLabel ?? "")}
+              {props.overnight ? " · nuit" : ""}
+            </p>
+          </div>,
+        );
       });
     }
 
@@ -159,10 +170,3 @@ export function CompareMap({ trips, colors }: { trips: SavedTrip[]; colors: stri
   return <div ref={containerRef} className="size-full min-h-[280px] bg-muted" />;
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
