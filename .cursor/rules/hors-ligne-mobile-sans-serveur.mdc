@@ -22,8 +22,9 @@ alwaysApply: true
 
 - Vérifier chaque écran à 390 px de large et en mode installé (PWA).
 - Cibles tactiles de 44 px minimum, safe areas respectées (`env(safe-area-inset-*)`), pas de survol comme seul mode d'interaction.
-- Pas de `window.confirm`, `alert`, `prompt` : confirmation intégrée à l'interface. (Reste à purger dans `itinerary-panel.tsx` et `trip-library-dialog.tsx`, phase 4.)
-- Les popups carte deviennent des composants React, pas des chaînes HTML (phase 4).
+- Pas de `window.confirm`, `alert`, `prompt` : confirmation intégrée à l'interface (`ConfirmAction`, `src/components/confirm-action.tsx`).
+- Les popups carte sont des composants React montés via `showReactPopup` (`src/components/react-popup.ts`), jamais des chaînes HTML.
+- Les champs texte liés au store écrivent à la validation (`useDraftField`), pas à chaque touche : chaque changement du brouillon est persisté dans IndexedDB.
 
 ## Socle réutilisable
 

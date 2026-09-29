@@ -75,7 +75,7 @@ export default defineConfig(({ mode }) => {
       privateDataPlugin(privateDir),
       spaFallbackPlugin(),
       VitePWA({
-        registerType: "autoUpdate",
+        registerType: "prompt",
         includeAssets: ["favicon.ico", "logo.svg", "fonts/*.ttf"],
         manifest: {
           name: "vanTravel",

@@ -15,15 +15,9 @@ const ITEMS: Array<{ key: LayerKey; label: string; hint: string }> = [
 ];
 
 export function LayerControls({
-  campsError,
-  osmCampsError,
-  freedomError,
   campsLoading,
   osmCampsLoading,
 }: {
-  campsError?: string | null;
-  osmCampsError?: string | null;
-  freedomError?: string | null;
   campsLoading?: boolean;
   osmCampsLoading?: boolean;
 }) {
@@ -60,17 +54,8 @@ export function LayerControls({
           {layers.camps && campsLoading && (
             <p className="text-xs text-muted-foreground">Chargement des campings DOC…</p>
           )}
-          {layers.camps && campsError && (
-            <p className="text-xs text-destructive">{campsError}</p>
-          )}
           {layers.osmCamps && osmCampsLoading && (
             <p className="text-xs text-muted-foreground">Chargement holiday parks / OSM…</p>
-          )}
-          {layers.osmCamps && osmCampsError && (
-            <p className="text-xs text-destructive">{osmCampsError}</p>
-          )}
-          {layers.freedom && freedomError && (
-            <p className="text-xs text-destructive">{freedomError}</p>
           )}
         </div>
       )}

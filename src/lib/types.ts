@@ -29,10 +29,72 @@ export type StopActivity = {
   text: string;
 };
 
+/** Commun aux entités du mode Voyager : sert à la fusion « dernière écriture gagne » (phase 5). */
+export type EntityMeta = {
+  id: string;
+  /** ISO 8601. */
+  updatedAt: string;
+  /** Prénom du profil local qui a écrit. */
+  updatedBy: string;
+};
+
+export type Money = { amount: number; currency: string };
+
+export type Booking = EntityMeta & {
+  /** Nom du camping, du loueur, de la compagnie. */
+  provider: string;
+  reference?: string;
+  /** Code d'accès, portail, boîte à clés : masqué par défaut à l'écran. */
+  accessCode?: string;
+  address?: string;
+  phone?: string;
+  url?: string;
+  /** Dates ou heures libres (« 14 h », « 2027-02-08 »). */
+  checkIn?: string;
+  checkOut?: string;
+  price?: Money;
+  notes?: string;
+};
+
+export type DocumentKind = "image" | "pdf";
+
+export type TripDocument = EntityMeta & {
+  kind: DocumentKind;
+  caption?: string;
+  /**
+   * Chemin cible dans le dépôt privé (`trips/<id>/docs/<docId>.<ext>`), rempli à la synchro (phase 5).
+   * Le contenu vit localement dans IndexedDB (`src/lib/document-store.ts`), jamais dans le brouillon JSON.
+   */
+  path: string;
+  size: number;
+  mimeType: string;
+};
+
+export type ChecklistItem = EntityMeta & {
+  text: string;
+  done: boolean;
+};
+
+export type ExpenseCategory = "carburant" | "camping" | "courses" | "resto" | "activite" | "transport" | "autre";
+
+export type Expense = EntityMeta & {
+  /** Date calendaire AAAA-MM-JJ. */
+  date: string;
+  amount: number;
+  currency: string;
+  category: ExpenseCategory;
+  /** Prénom de la personne qui a payé. */
+  paidBy: string;
+  note?: string;
+};
+
 export type Stop = PlaceInput & {
   id: string;
   isOvernight: boolean;
   activities: StopActivity[];
+  bookings: Booking[];
+  documents: TripDocument[];
+  checklist: ChecklistItem[];
 };
 
 export type RouteOption = {
@@ -61,6 +123,11 @@ export type TripDay = {
   locked: boolean;
   overnightStopId: string | null;
   stopIds: string[];
+  /** Notes du jour saisies en voyage. */
+  notes?: string;
+  /** Météo notée à la main (« grand soleil, vent l'après-midi »). */
+  weather?: string;
+  expenses: Expense[];
 };
 
 export type LayerKey = "towns" | "pois" | "camps" | "osmCamps" | "freedom" | "custom";
@@ -77,11 +144,15 @@ export type CustomPinDraft = {
 };
 
 export type TripSnapshot = {
+  /** Version de forme du snapshot (voir `src/lib/migrations.ts`) ; absente sur les anciens circuits (= 1). */
+  schemaVersion?: number;
   days: TripDay[];
   stops: Record<string, Stop>;
   legs: Leg[];
   customPins: PlaceInput[];
   currentDayIndex: number;
+  /** Date ISO du figeage de l'itinéraire (une géométrie par tronçon) ; `null` tant qu'on planifie. */
+  frozenAt?: string | null;
 };
 
 export type TripMarkKind = "plus" | "minus";
@@ -112,6 +183,8 @@ export type RegionPreset = {
   bbox: { xmin: number; ymin: number; xmax: number; ymax: number };
   maxBounds: [[number, number], [number, number]];
   timeZone: string;
+  /** Devise locale par défaut des dépenses (code ISO 4217). */
+  currency: string;
 };
 
 export type RestrictedRoad = { id: string; name: string; note: string };

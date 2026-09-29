@@ -10,7 +10,7 @@ import type {
 } from "maplibre-gl";
 import { buildCatalog, type Catalog } from "@/lib/catalog";
 import { asPointCollection } from "@/lib/geo";
-import { amenityChipsHtml, amenitiesFromProperties, amenitySummary } from "@/lib/amenities";
+import { amenityChips, amenitiesFromProperties, amenitySummary } from "@/lib/amenities";
 import { dayColor, MAP_MAX_ZOOM, MAP_MIN_ZOOM, buildMapStyle } from "@/lib/constants";
 import { setActiveMap } from "@/lib/map-registry";
 import { absoluteAssetUrl } from "@/lib/base-url";
@@ -20,7 +20,10 @@ import type { CatalogPlace, LayersState, PlaceInput, PlaceKind } from "@/lib/typ
 import { selectedOption, useTripStore } from "@/store/trip-store";
 import { AlternativesCard } from "@/components/alternatives-card";
 import { CustomPinDialog } from "@/components/custom-pin-dialog";
+import { DatasetNotice, type DatasetProblem } from "@/components/dataset-notice";
 import { LayerControls } from "@/components/layer-controls";
+import { PlacePopup } from "@/components/map-popup";
+import { showReactPopup } from "@/components/react-popup";
 
 const CLICKABLE = [
   "towns-circle",
@@ -56,14 +59,6 @@ function placesToGeoJSON(places: CatalogPlace[], kind: PlaceKind): GeoJSON.Featu
       },
     })),
   };
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 function emptyFc(): GeoJSON.FeatureCollection {
@@ -123,74 +118,78 @@ function onFeatureClick(
   const layer = feature.layer.id;
   const coords = lngLat;
 
+  if (!popup) return;
+
   if (layer === "itinerary-points") {
     const name = String(props.name ?? "Lieu");
-    const node = document.createElement("div");
-    node.className = "p-3 text-sm w-[240px]";
-    node.innerHTML = `
-      <p class="font-medium leading-tight">${escapeHtml(name)}</p>
-      <p class="mt-1 text-xs opacity-70">Étape ${escapeHtml(String(props.seq ?? ""))} · ${escapeHtml(String(props.dayLabel ?? ""))}</p>
-      <button type="button" data-add class="mt-3 inline-flex h-8 w-full items-center justify-center rounded-lg bg-emerald-800 text-white text-xs font-medium">Repasser ici</button>
-    `;
-    node.querySelector("[data-add]")?.addEventListener("click", () => {
-      const point = pointOf(feature, coords);
-      void useTripStore.getState().addPlace({
-        placeId: String(props.placeId ?? name),
-        name,
-        lng: point[0],
-        lat: point[1],
-        kind: (props.kind as PlaceKind) || "custom",
-        notes: String(props.notes ?? "") || undefined,
-        warning: String(props.warning ?? "") || undefined,
-      });
-      popup?.remove();
-    });
-    popup?.setLngLat(coords).setDOMContent(node).addTo(map);
+    showReactPopup(
+      popup,
+      map,
+      coords,
+      <PlacePopup
+        title={name}
+        subtitle={`Étape ${String(props.seq ?? "")} · ${String(props.dayLabel ?? "")}`}
+        actionLabel="Repasser ici"
+        onAction={() => {
+          const point = pointOf(feature, coords);
+          void useTripStore.getState().addPlace({
+            placeId: String(props.placeId ?? name),
+            name,
+            lng: point[0],
+            lat: point[1],
+            kind: (props.kind as PlaceKind) || "custom",
+            notes: String(props.notes ?? "") || undefined,
+            warning: String(props.warning ?? "") || undefined,
+          });
+          popup.remove();
+        }}
+      />,
+    );
     return;
   }
 
   const name = String(props.name ?? props.Name ?? "Lieu");
   const kind = inferKind(layer, props);
   const notes = String(props.notes ?? props.introduction ?? props.Condition_1 ?? "");
-      const extra = extraLines(kind, props);
-      const amenityHtml = amenityChipsHtml(amenitiesFromProperties(props));
-      const warning = String(props.warning ?? "");
-      const docLink = typeof props.staticLink === "string" ? props.staticLink : "";
-      const webLink = typeof props.website === "string" ? props.website : "";
-      const link = docLink || webLink;
-      const linkLabel = docLink ? "Fiche DOC" : "Site web";
-      const node = document.createElement("div");
-      node.className = "p-3 text-sm w-[240px]";
-      node.innerHTML = `
-      <p class="font-medium leading-tight">${escapeHtml(name)}</p>
-      <p class="mt-1 text-xs opacity-70">${escapeHtml(kindLabel(kind, props))}${props.region || props.Location || props.operator ? ` · ${escapeHtml(String(props.region || props.Location || props.operator))}` : ""}</p>
-      ${extra}
-      ${amenityHtml}
-      ${notes ? `<p class="mt-2 text-xs leading-snug opacity-80">${escapeHtml(notes.slice(0, 220))}</p>` : ""}
-      ${warning ? `<p class="mt-2 text-xs text-red-700">${escapeHtml(warning)}</p>` : ""}
-      ${link ? `<a class="mt-2 inline-block text-xs underline" href="${escapeHtml(link)}" target="_blank" rel="noreferrer">${linkLabel}</a>` : ""}
-      <button type="button" data-add class="mt-3 inline-flex h-8 w-full items-center justify-center rounded-lg bg-emerald-800 text-white text-xs font-medium">Ajouter à l’itinéraire</button>
-    `;
-  node.querySelector("[data-add]")?.addEventListener("click", () => {
-    const point = pointOf(feature, coords);
-    const place: PlaceInput = {
-        placeId: String(props.id ?? props.assetId ?? props.OBJECTID ?? name),
-        name,
-        lng: point[0],
-        lat: point[1],
-        kind,
-        notes: notes || undefined,
-        warning: warning || undefined,
-        area: String(props.area ?? "") || undefined,
-        meta: {
-          amenities: amenitySummary(amenitiesFromProperties(props)) || null,
-          source: String(props.source ?? ""),
-        },
-      };
-    void useTripStore.getState().addPlace(place);
-    popup?.remove();
-  });
-  popup?.setLngLat(coords).setDOMContent(node).addTo(map);
+  const warning = String(props.warning ?? "");
+  const docLink = typeof props.staticLink === "string" ? props.staticLink : "";
+  const webLink = typeof props.website === "string" ? props.website : "";
+  const link = docLink ? { href: docLink, label: "Fiche DOC" } : webLink ? { href: webLink, label: "Site web" } : null;
+  const origin = props.region || props.Location || props.operator;
+  showReactPopup(
+    popup,
+    map,
+    coords,
+    <PlacePopup
+      title={name}
+      subtitle={`${kindLabel(kind, props)}${origin ? ` · ${String(origin)}` : ""}`}
+      details={extraLines(kind, props)}
+      amenities={amenityChips(amenitiesFromProperties(props))}
+      notes={notes || undefined}
+      warning={warning || undefined}
+      link={link}
+      actionLabel="Ajouter à l’itinéraire"
+      onAction={() => {
+        const point = pointOf(feature, coords);
+        const place: PlaceInput = {
+          placeId: String(props.id ?? props.assetId ?? props.OBJECTID ?? name),
+          name,
+          lng: point[0],
+          lat: point[1],
+          kind,
+          notes: notes || undefined,
+          warning: warning || undefined,
+          area: String(props.area ?? "") || undefined,
+          meta: {
+            amenities: amenitySummary(amenitiesFromProperties(props)) || null,
+            source: String(props.source ?? ""),
+          },
+        };
+        void useTripStore.getState().addPlace(place);
+        popup.remove();
+      }}
+    />,
+  );
 }
 
 export function TripMap() {
@@ -441,12 +440,13 @@ export function TripMap() {
           Carte : {mapError}
         </div>
       )}
-      <LayerControls
-        campsError={campsError}
-        osmCampsError={osmCampsError}
-        freedomError={freedomError}
-        campsLoading={!camps && !campsError}
-        osmCampsLoading={!osmCamps && !osmCampsError}
+      <LayerControls campsLoading={!camps && !campsError} osmCampsLoading={!osmCamps && !osmCampsError} />
+      <DatasetNotice
+        problems={[
+          campsError ? { label: "Campings DOC", message: campsError } : null,
+          osmCampsError ? { label: "Holiday parks et aires OSM", message: osmCampsError } : null,
+          freedomError ? { label: "Freedom camping", message: freedomError } : null,
+        ].filter((p): p is DatasetProblem => p != null)}
       />
       <AlternativesCard />
       {routingStatus !== "idle" || routingMessage ? (
@@ -807,7 +807,8 @@ function kindLabel(kind: PlaceKind, props?: GeoJSON.GeoJsonProperties): string {
   }
 }
 
-function extraLines(kind: PlaceKind, props: GeoJSON.GeoJsonProperties): string {
+/** Lignes de détail d'une popup, en texte brut : le composant React les échappe. */
+function extraLines(kind: PlaceKind, props: GeoJSON.GeoJsonProperties): string[] {
   if (kind === "camp" && props?.source === "OSM") {
     const type =
       props.amenity === "sanitary_dump_station"
@@ -815,28 +816,22 @@ function extraLines(kind: PlaceKind, props: GeoJSON.GeoJsonProperties): string {
         : props.tourism === "caravan_site"
           ? "Holiday park"
           : "Camping / aire";
-    return `<p class="mt-1 text-xs">${type} · OpenStreetMap</p>`;
+    return [`${type} · OpenStreetMap`];
   }
   if (kind === "camp") {
-    const cat = props?.campsiteCategory ? escapeHtml(String(props.campsiteCategory)) : "";
-    const bookable = props?.bookable ? `Réservable : ${escapeHtml(String(props.bookable))}` : "";
-    const unpowered = props?.numberOfUnpoweredSites
-      ? `${props.numberOfUnpoweredSites} non-électriques`
-      : "";
-    const powered = props?.numberOfPoweredSites
-      ? `${props.numberOfPoweredSites} électriques`
-      : "";
+    const cat = props?.campsiteCategory ? String(props.campsiteCategory) : "";
+    const bookable = props?.bookable ? `Réservable : ${String(props.bookable)}` : "";
+    const unpowered = props?.numberOfUnpoweredSites ? `${props.numberOfUnpoweredSites} non-électriques` : "";
+    const powered = props?.numberOfPoweredSites ? `${props.numberOfPoweredSites} électriques` : "";
     const bits = [cat, bookable, unpowered, powered].filter(Boolean).join(" · ");
-    return bits ? `<p class="mt-1 text-xs">${bits}</p>` : "";
+    return bits ? [bits] : [];
   }
   if (kind === "freedom") {
-    const cat = escapeHtml(String(props?.Site_Category_Type ?? ""));
-    return cat ? `<p class="mt-1 text-xs">Catégorie DOC : ${cat}</p>` : "";
+    const cat = String(props?.Site_Category_Type ?? "");
+    return cat ? [`Catégorie DOC : ${cat}`] : [];
   }
-  if (props?.category) {
-    return `<p class="mt-1 text-xs">${escapeHtml(String(props.category))}</p>`;
-  }
-  return "";
+  if (props?.category) return [String(props.category)];
+  return [];
 }
 
 function pointOf(feature: MapGeoJSONFeature, fallback: LngLat): [number, number] {

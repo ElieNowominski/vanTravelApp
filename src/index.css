@@ -154,3 +154,23 @@ body {
   margin: 0;
   overflow: hidden;
 }
+
+/* Roadbook : la page défile dans son propre conteneur ; à l'impression, tout s'étale. */
+@media print {
+  html,
+  body,
+  #root {
+    height: auto;
+    overflow: visible;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .roadbook-day {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  a[href]::after {
+    content: none;
+  }
+}

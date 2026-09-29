@@ -14,8 +14,9 @@ const snapshot: TripSnapshot = {
       locked: true,
       overnightStopId: "s2",
       stopIds: ["s1", "s2"],
+      expenses: [],
     },
-    { date: "2027-02-08", label: "8 févr.", weekday: "Lun", locked: false, overnightStopId: null, stopIds: ["s3"] },
+    { date: "2027-02-08", label: "8 févr.", weekday: "Lun", locked: false, overnightStopId: null, stopIds: ["s3"], expenses: [] },
   ],
   stops: {
     s1: {
@@ -27,6 +28,9 @@ const snapshot: TripSnapshot = {
       kind: "town",
       isOvernight: false,
       activities: [],
+      bookings: [],
+      documents: [],
+      checklist: [],
     },
     s2: {
       id: "s2",
@@ -38,6 +42,9 @@ const snapshot: TripSnapshot = {
       area: "Tekapo",
       isOvernight: true,
       activities: [{ id: "a1", text: "Étoiles" }],
+      bookings: [],
+      documents: [],
+      checklist: [],
     },
     s3: {
       id: "s3",
@@ -48,6 +55,9 @@ const snapshot: TripSnapshot = {
       kind: "poi",
       isOvernight: false,
       activities: [],
+      bookings: [],
+      documents: [],
+      checklist: [],
     },
   },
 };

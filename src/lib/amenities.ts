@@ -79,8 +79,11 @@ export function amenitiesFromProperties(
   return amenitiesFromDoc(props);
 }
 
-export function amenityChipsHtml(flags: AmenityFlags): string {
-  const chips: Array<{ label: string; ok: boolean }> = [];
+export type AmenityChip = { label: string; ok: boolean };
+
+/** Puces à afficher dans une popup : rendu par `PlacePopup` (React), pas en HTML assemblé. */
+export function amenityChips(flags: AmenityFlags): AmenityChip[] {
+  const chips: AmenityChip[] = [];
   if (flags.free === true) chips.push({ label: "Gratuit", ok: true });
   if (flags.free === false) chips.push({ label: "Payant", ok: false });
   if (flags.water === true) chips.push({ label: "Eau", ok: true });
@@ -88,15 +91,7 @@ export function amenityChipsHtml(flags: AmenityFlags): string {
   if (flags.toilets === true) chips.push({ label: "Toilettes", ok: true });
   if (flags.shower === true) chips.push({ label: "Douche", ok: true });
   if (flags.dump === true) chips.push({ label: "Dump station", ok: true });
-  if (chips.length === 0) return "";
-  const items = chips
-    .map((chip) => {
-      const bg = chip.ok ? "#ecfdf5" : "#fff7ed";
-      const fg = chip.ok ? "#0f766e" : "#9a3412";
-      return `<span style="display:inline-block;margin:2px 4px 0 0;padding:2px 6px;border-radius:999px;background:${bg};color:${fg};font-size:10px;line-height:1.4;">${chip.label}</span>`;
-    })
-    .join("");
-  return `<p class="mt-2 leading-none">${items}</p>`;
+  return chips;
 }
 
 export function amenitySummary(flags: AmenityFlags): string {
