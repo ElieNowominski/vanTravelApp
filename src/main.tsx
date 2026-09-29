@@ -4,7 +4,12 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { registerSW } from "virtual:pwa-register";
 import { App } from "./app";
-import { bindServiceWorkerUpdater, reportNeedRefresh, reportOfflineReady } from "./services/app-update";
+import {
+  answerUpdateCapabilityProbes,
+  bindServiceWorkerUpdater,
+  reportNeedRefresh,
+  reportOfflineReady,
+} from "./services/app-update";
 
 // Mode « prompt » : la nouvelle version s'installe en arrière-plan et attend un toucher sur
 // « Mettre à jour » (bannière), pour ne jamais recharger la page pendant une saisie en voyage.
@@ -19,6 +24,7 @@ const updateSW = registerSW({
   },
 });
 bindServiceWorkerUpdater(updateSW);
+answerUpdateCapabilityProbes();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

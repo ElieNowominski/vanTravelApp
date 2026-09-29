@@ -101,7 +101,10 @@ export default defineConfig(({ mode }) => {
           ],
         },
         workbox: {
+          // Pont de transition vers le mode « prompt » (voir public/sw-bridge.js).
+          importScripts: ["sw-bridge.js"],
           globPatterns: ["**/*.{js,mjs,css,html,ico,png,svg,ttf,woff2,json,geojson}"],
+          globIgnores: ["sw-bridge.js"],
           // Les jeux de données (campings) dépassent 2 Mo : on les veut hors ligne.
           maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
           navigateFallback: `${base}index.html`,

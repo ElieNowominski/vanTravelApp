@@ -38,6 +38,19 @@ export function bindServiceWorkerUpdater(fn: (reload?: boolean) => Promise<void>
   updateServiceWorker = fn;
 }
 
+/**
+ * Répond au pont de transition du service worker (`public/sw-bridge.js`) : cette page sait
+ * afficher l'invite, la nouvelle version peut donc attendre au lieu de prendre la main.
+ */
+export function answerUpdateCapabilityProbes(): void {
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    const data = event.data as { type?: string } | null;
+    if (data?.type !== "VANTRAVEL_UPDATE_CAPABILITIES") return;
+    event.ports[0]?.postMessage("PROMPT_UPDATE_SUPPORTED");
+  });
+}
+
 export function reportNeedRefresh(): void {
   useAppUpdateStore.setState({ needRefresh: true });
 }
