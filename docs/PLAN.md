@@ -43,7 +43,7 @@ Objectif : l'app installée sur le téléphone se lance et affiche l'itinéraire
 - [x] Bandeau d'état réseau (`network-banner.tsx` ; la synchro en attente s'y ajoutera en phase 5) et bouton d'installation PWA (`install-button.tsx`, `use-install-prompt.ts`, guide iOS ; contexte calculé dans `src/lib/pwa.ts`, testé).
 - [x] Allègement du stockage : `src/lib/freeze.ts` (testé), `frozenAt` sur le snapshot et le brouillon, commandes « Figer l'itinéraire » et « Rouvrir » dans la bibliothèque avec le gain affiché, badge « Figé » dans le panneau.
 - [x] Notice claire sur la carte quand un jeu de données manque (`dataset-notice.tsx`), fermable et non bloquante : l'itinéraire et les fiches n'en dépendent pas. Les calques ne portent plus d'erreur.
-- [x] Service worker vérifié sur un build `BASE_PATH=/vanTravelApp/` : `navigateFallback` → `/vanTravelApp/index.html`, trois `.geojson` précachés (39 entrées, 4,4 Mo), mise à jour `autoUpdate` (la page se recharge seule à l'arrivée d'une version : à surveiller pendant une saisie).
+- [x] Service worker vérifié sur un build `BASE_PATH=/vanTravelApp/` : `navigateFallback` → `/vanTravelApp/index.html`, trois `.geojson` précachés (39 entrées, 4,4 Mo), mise à jour en mode `prompt` : la nouvelle version attend un toucher sur « Mettre à jour » (`update-banner.tsx`, `src/services/app-update.ts`), rien ne se recharge pendant une saisie ; revérification horaire.
 - [ ] Test Playwright minimal (optionnel, non fait) : chargement, ouverture d'un circuit de démo, mode hors ligne.
 
 Critère : Lighthouse PWA installable ; en avion, l'itinéraire et les fiches s'ouvrent.

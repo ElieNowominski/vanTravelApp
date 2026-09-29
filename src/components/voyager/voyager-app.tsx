@@ -4,6 +4,7 @@ import { BookOpen, CalendarDays, ChevronRight, Moon, Receipt } from "lucide-reac
 import { InstallButton } from "@/components/install-button";
 import { ModeSwitch } from "@/components/mode-switch";
 import { NetworkBanner } from "@/components/network-banner";
+import { UpdateBanner } from "@/components/update-banner";
 import { Button } from "@/components/ui/button";
 import { DayStrip } from "@/components/voyager/day-strip";
 import { ExpensesPanel } from "@/components/voyager/expenses-panel";
@@ -51,6 +52,7 @@ export function VoyagerApp() {
 
   return (
     <div className="flex h-dvh min-h-0 flex-col bg-background pt-[env(safe-area-inset-top,0px)]">
+      <UpdateBanner />
       <NetworkBanner />
       <header className="flex flex-col gap-2 border-b px-4 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">

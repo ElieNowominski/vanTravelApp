@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { List, Map as MapIcon } from "lucide-react";
 import { ItineraryPanel } from "@/components/itinerary-panel";
 import { NetworkBanner } from "@/components/network-banner";
+import { UpdateBanner } from "@/components/update-banner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TripMap } from "@/components/trip-map";
 import { TripSetupScreen } from "@/components/trip-setup-screen";
@@ -73,6 +74,7 @@ function PlanApp() {
   return (
     <TooltipProvider>
       <div className="flex h-dvh min-h-0 flex-col pt-[env(safe-area-inset-top,0px)]">
+        <UpdateBanner />
         <NetworkBanner />
         <div className="flex min-h-0 flex-1 flex-col md:flex-row">
           <div className={cn("relative min-h-0 flex-1", view === "map" ? "block" : "hidden md:block")}>
