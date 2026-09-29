@@ -1,6 +1,8 @@
 # vanTravelApp
 
-Application personnelle de roadtrip en van (deux utilisateurs, mobile et web), SPA Vite + React déployée sur GitHub Pages. Ce dépôt est **public**. Architecture et décisions : `docs/ARCHITECTURE.md`. Règles détaillées : `.cursor/rules/`.
+Application personnelle de roadtrip en van (deux utilisateurs, mobile et web), SPA Vite + React déployée sur GitHub Pages. Ce dépôt est **public**. Architecture et décisions : `docs/ARCHITECTURE.md`. Plan de travail et état d'avancement : `docs/PLAN.md` (à mettre à jour en fin de session). Règles détaillées : `.cursor/rules/`.
+
+Dépôt jumeau **privé** : `../vanTravel` (`C:/Users/enowo/Documents/Projects/vanTravel`), dossier `trips/` = données de voyage, servi en dev sous `/__private/`. Site publié : https://elienowominski.github.io/vanTravelApp/
 
 ## Règles
 

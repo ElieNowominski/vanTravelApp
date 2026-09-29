@@ -17,7 +17,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { TripLibraryButton } from "@/components/trip-library-dialog";
 import { TripMarksEditor } from "@/components/trip-marks-editor";
@@ -243,7 +242,7 @@ export function ItineraryPanel() {
         )}
       </div>
 
-      <ScrollArea className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
         <div className="flex flex-col gap-3 p-3">
           <p className="px-1 text-xs text-muted-foreground">
             Clique une ville ou un spot sur la carte pour enchaîner les étapes. « Nuit ici »
@@ -433,7 +432,7 @@ export function ItineraryPanel() {
             );
           })}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

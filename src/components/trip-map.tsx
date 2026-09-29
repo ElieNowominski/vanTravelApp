@@ -350,6 +350,17 @@ export function TripMap() {
 
   useEffect(() => {
     const map = mapRef.current;
+    const el = containerRef.current;
+    if (!map || !el || !mapReady) return;
+    // Onglets mobile : le conteneur passe de display:none à visible, la carte doit se remesurer.
+    const observer = new ResizeObserver(() => map.resize());
+    observer.observe(el);
+    map.resize();
+    return () => observer.disconnect();
+  }, [mapReady]);
+
+  useEffect(() => {
+    const map = mapRef.current;
     if (!map || !mapReady) return;
     syncItinerary(map);
   }, [days, stops, legs, mapReady]);

@@ -1,18 +1,48 @@
-import { useEffect, useState } from "react";
-import { List } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { List, Map as MapIcon } from "lucide-react";
 import { ItineraryPanel } from "@/components/itinerary-panel";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TripMap } from "@/components/trip-map";
 import { TripSetupScreen } from "@/components/trip-setup-screen";
+import { cn } from "@/lib/utils";
 import { loadDevTrip } from "@/services/trip-source";
 import { useTripStore } from "@/store/trip-store";
 
+type MobileView = "map" | "list";
+
+function viewFromHistory(): MobileView {
+  const state = window.history.state as { view?: MobileView } | null;
+  return state?.view === "list" ? "list" : "map";
+}
+
 export function TripApp() {
-  const [sheetOpen, setSheetOpen] = useState(false);
   const [ready, setReady] = useState(false);
   const config = useTripStore((s) => s.config);
+
+  /**
+   * Mobile : deux onglets (carte, itinéraire) plutôt qu'un tiroir modal.
+   * L'onglet itinéraire pousse une entrée d'historique : le geste « retour » du téléphone ramène à la carte.
+   */
+  const [view, setView] = useState<MobileView>(() => viewFromHistory());
+
+  useEffect(() => {
+    const onPop = () => setView(viewFromHistory());
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const showList = useCallback(() => {
+    if (viewFromHistory() !== "list") window.history.pushState({ view: "list" }, "");
+    setView("list");
+  }, []);
+
+  const showMap = useCallback(() => {
+    if (viewFromHistory() === "list") {
+      window.history.back();
+      return;
+    }
+    setView("map");
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,28 +82,58 @@ export function TripApp() {
 
   return (
     <TooltipProvider>
-      <div className="flex h-dvh min-h-0 flex-col md:flex-row">
-        <div className="relative min-h-0 flex-1">
+      <div className="flex h-dvh min-h-0 flex-col pt-[env(safe-area-inset-top,0px)] md:flex-row md:pt-0">
+        <div className={cn("relative min-h-0 flex-1", view === "map" ? "block" : "hidden md:block")}>
           <TripMap />
-          <Button
-            className="absolute right-3 bottom-[calc(4rem+env(safe-area-inset-bottom,0px))] z-20 shadow-lg md:hidden"
-            onClick={() => setSheetOpen(true)}
-          >
-            <List className="size-4" />
-            Itinéraire
-          </Button>
         </div>
-        <aside className="hidden h-full w-[min(100%,26rem)] shrink-0 border-l md:block">
+        <aside
+          className={cn(
+            "min-h-0 flex-1 md:h-full md:w-[min(100%,26rem)] md:flex-none md:border-l",
+            view === "list" ? "block" : "hidden md:block",
+          )}
+        >
           <ItineraryPanel />
         </aside>
-        {sheetOpen ? (
-          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-            <SheetContent side="bottom" className="h-[80vh] p-0 sm:max-w-none" showCloseButton>
-              <ItineraryPanel />
-            </SheetContent>
-          </Sheet>
-        ) : null}
+        <nav
+          aria-label="Vue"
+          className="flex shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom,0px)] md:hidden"
+        >
+          <MobileTab active={view === "map"} onClick={showMap} label="Carte" icon={<MapIcon className="size-5" />} />
+          <MobileTab
+            active={view === "list"}
+            onClick={showList}
+            label="Itinéraire"
+            icon={<List className="size-5" />}
+          />
+        </nav>
       </div>
     </TooltipProvider>
+  );
+}
+
+function MobileTab({
+  active,
+  onClick,
+  label,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  icon: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-current={active ? "page" : undefined}
+      onClick={onClick}
+      className={cn(
+        "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs font-medium",
+        active ? "text-primary" : "text-muted-foreground",
+      )}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
