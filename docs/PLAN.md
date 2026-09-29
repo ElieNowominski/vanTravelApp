@@ -15,14 +15,14 @@ Site publié : `https://elienowominski.github.io/vanTravelApp/`. Déploiement au
 
 Prompt de reprise à coller dans une nouvelle session :
 
-> Lis `CLAUDE.md`, `docs/ARCHITECTURE.md` et `docs/PLAN.md`. Le dépôt privé est dans `../vanTravel`. Reprends à la première étape non cochée de la phase en cours, dans une branche, et mets à jour l'état du plan en fin de travail.
+> Lis `CLAUDE.md`, `docs/ARCHITECTURE.md` et `docs/PLAN.md`. Le dépôt privé est dans `../vanTravel`. Reprends à la première étape non cochée de la phase en cours, commite directement sur `main` (personne seule sur le projet, le déploiement suit chaque push) et mets à jour l'état du plan en fin de travail.
 
 ## État
 
 - [x] Phase 1 : hygiène (token révoqué, sauvegarde export et import, lint propre)
 - [x] Phase 2 : Vite, entité `TripConfig`, données au build, PWA de base, GitHub Pages en ligne (29 sept. 2026)
 - [x] Phase 3 : hors ligne solide (29 sept. 2026 : onglets Carte / Itinéraire avec geste retour, bandeau réseau, bouton d'installation, figeage de l'itinéraire, notice de jeux de données, service worker vérifié sous `/vanTravelApp/` ; test Playwright optionnel non fait)
-- [x] Phase 4 : mode Voyager (29 sept. 2026, branche `phase-4-voyager` : schéma v2 migré et testé, écran « Aujourd'hui », fiches étape, dépenses, roadbook, popups React, `window.confirm` purgé). **Reste à valider sur téléphone à 390 px et réseau coupé** avant la PR ; jsPDF conservé jusque-là.
+- [x] Phase 4 : mode Voyager (29 sept. 2026, branche `phase-4-voyager` : schéma v2 migré et testé, écran « Aujourd'hui », fiches étape, dépenses, roadbook, popups React, `window.confirm` purgé). Fusionnée dans `main` (PR #1). **Reste à valider sur téléphone à 390 px et réseau coupé** ; jsPDF conservé jusque-là.
 - [ ] Phase 5 : synchronisation entre appareils
 - [ ] Phase 6 : socle multi-voyage, Google
 
@@ -30,7 +30,7 @@ Fait savoir : les données sont stockées **par navigateur et par appareil** (In
 
 ## Conventions de travail
 
-- Une branche par phase (`phase-3-offline`, `phase-4-voyager`…), PR vers `main`, le déploiement suit.
+- Commits directement sur `main`, hotfix compris : une seule personne travaille sur le projet et chaque push déploie. Pas de branche ni de PR sauf demande explicite (les phases 3 et 4 ont été livrées par PR, avant cette décision du 29 sept. 2026).
 - Avant de livrer : `npm run lint && npm run typecheck && npm test && npm run build`, puis test manuel à 390 px et réseau coupé pour tout ce qui touche au mode Voyager. Libérer le port 43217.
 - Toute nouvelle forme de donnée stockée : bump de `schemaVersion`, migration dans `src/lib`, test Vitest.
 - Logique dans `src/lib` (pure) et `src/services` (réseau) ; composants sans calcul.

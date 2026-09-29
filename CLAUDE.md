@@ -15,6 +15,7 @@ Dépôt jumeau **privé** : `../vanTravel` (`C:/Users/enowo/Documents/Projects/v
 7. **Logique métier dans `src/lib`, pure et testée avec Vitest** ; les composants n'hébergent pas de calcul. Les services réseau vivent dans `src/services`.
 8. **Sources externes** : respecter les politiques d'usage (attribution OSM et OSRM, pas de préchargement de tuiles OSM, une requête par seconde vers OSRM).
 9. **Port de dev 43217** : le libérer après tout test (voir `.cursor/rules/liberer-port-dev.mdc`).
+10. **Git : commits directement sur `main`**, hotfix compris. Une seule personne travaille ici et chaque push déploie sur Pages. Pas de branche ni de PR sauf demande explicite. Avant chaque commit : lint, typecheck, tests, et le contrôle « aucune donnée perso » de `.cursor/rules/donnees-perso-et-securite.mdc`.
 
 ## Commandes
 
