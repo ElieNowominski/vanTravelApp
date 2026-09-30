@@ -56,12 +56,20 @@ function patchDay(set: Set, dayIndex: number, fn: (day: TripDay) => TripDay) {
   });
 }
 
+/** Une suppression laisse une pierre tombale : la synchro ne fera pas renaître l'entité. */
+function bury(prev: TripState, id: string): Record<string, string> {
+  return { ...(prev.tombstones ?? {}), [id]: new Date().toISOString() };
+}
+
 export function createTravelSlice(set: Set): TravelSlice {
   return {
     uiMode: null,
     setUiMode: (mode) => set(() => ({ uiMode: mode })),
 
-    setStopNotes: (stopId, notes) => patchStop(set, stopId, (stop) => ({ ...stop, notes: clean(notes) })),
+    setStopNotes: (stopId, notes) =>
+      patchStop(set, stopId, (stop) =>
+        clean(notes) === clean(stop.notes) ? stop : { ...stop, notes: clean(notes), notesAt: stamp().updatedAt },
+      ),
 
     upsertBooking: (stopId, input, bookingId) => {
       const id = bookingId ?? newId("booking");
@@ -90,7 +98,14 @@ export function createTravelSlice(set: Set): TravelSlice {
     },
 
     removeBooking: (stopId, bookingId) =>
-      patchStop(set, stopId, (stop) => ({ ...stop, bookings: stop.bookings.filter((b) => b.id !== bookingId) })),
+      set((prev) => {
+        const stop = prev.stops[stopId];
+        if (!stop) return {};
+        return {
+          stops: { ...prev.stops, [stopId]: { ...stop, bookings: stop.bookings.filter((b) => b.id !== bookingId) } },
+          tombstones: bury(prev, bookingId),
+        };
+      }),
 
     addDocument: (stopId, input) => {
       const id = input.id ?? newId("doc");
@@ -108,7 +123,14 @@ export function createTravelSlice(set: Set): TravelSlice {
       })),
 
     removeDocument: (stopId, documentId) =>
-      patchStop(set, stopId, (stop) => ({ ...stop, documents: stop.documents.filter((d) => d.id !== documentId) })),
+      set((prev) => {
+        const stop = prev.stops[stopId];
+        if (!stop) return {};
+        return {
+          stops: { ...prev.stops, [stopId]: { ...stop, documents: stop.documents.filter((d) => d.id !== documentId) } },
+          tombstones: bury(prev, documentId),
+        };
+      }),
 
     addChecklistItem: (stopId, text) => {
       const trimmed = text.trim();
@@ -126,11 +148,24 @@ export function createTravelSlice(set: Set): TravelSlice {
       })),
 
     removeChecklistItem: (stopId, itemId) =>
-      patchStop(set, stopId, (stop) => ({ ...stop, checklist: stop.checklist.filter((item) => item.id !== itemId) })),
+      set((prev) => {
+        const stop = prev.stops[stopId];
+        if (!stop) return {};
+        return {
+          stops: { ...prev.stops, [stopId]: { ...stop, checklist: stop.checklist.filter((item) => item.id !== itemId) } },
+          tombstones: bury(prev, itemId),
+        };
+      }),
 
-    setDayNotes: (dayIndex, notes) => patchDay(set, dayIndex, (day) => ({ ...day, notes: clean(notes) })),
+    setDayNotes: (dayIndex, notes) =>
+      patchDay(set, dayIndex, (day) =>
+        clean(notes) === clean(day.notes) ? day : { ...day, notes: clean(notes), notesAt: stamp().updatedAt },
+      ),
 
-    setDayWeather: (dayIndex, weather) => patchDay(set, dayIndex, (day) => ({ ...day, weather: clean(weather) })),
+    setDayWeather: (dayIndex, weather) =>
+      patchDay(set, dayIndex, (day) =>
+        clean(weather) === clean(day.weather) ? day : { ...day, weather: clean(weather), weatherAt: stamp().updatedAt },
+      ),
 
     addExpense: (dayIndex, input) => {
       const id = newId("exp");
@@ -151,6 +186,15 @@ export function createTravelSlice(set: Set): TravelSlice {
       })),
 
     removeExpense: (dayIndex, expenseId) =>
-      patchDay(set, dayIndex, (day) => ({ ...day, expenses: (day.expenses ?? []).filter((e) => e.id !== expenseId) })),
+      set((prev) => {
+        const day = prev.days[dayIndex];
+        if (!day) return {};
+        return {
+          days: prev.days.map((d, i) =>
+            i === dayIndex ? { ...d, expenses: (d.expenses ?? []).filter((e) => e.id !== expenseId) } : d,
+          ),
+          tombstones: bury(prev, expenseId),
+        };
+      }),
   };
 }

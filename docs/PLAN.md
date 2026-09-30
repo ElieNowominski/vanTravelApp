@@ -24,10 +24,10 @@ Prompt de reprise à coller dans une nouvelle session :
 - [x] Phase 3 : hors ligne solide (29 sept. 2026 : onglets Carte / Itinéraire avec geste retour, bandeau réseau, bouton d'installation, figeage de l'itinéraire, notice de jeux de données, service worker vérifié sous `/vanTravelApp/` ; test Playwright optionnel non fait)
 - [x] Phase 4 : mode Voyager (29 sept. 2026, branche `phase-4-voyager` : schéma v2 migré et testé, écran « Aujourd'hui », fiches étape, dépenses, roadbook, popups React, `window.confirm` purgé). Fusionnée dans `main` (PR #1). **Reste à valider sur téléphone à 390 px et réseau coupé** ; jsPDF conservé jusque-là.
 - [x] Correctifs iPhone (30 sept. 2026, voir « iPhone » ci-dessous) : à **confirmer sur l'iPhone** (Safari puis app installée) car aucun WebKit n'est disponible en session.
-- [ ] Phase 5 : synchronisation entre appareils
+- [x] Phase 5 : synchronisation entre appareils (30 sept. 2026 : code livré et testé unitairement ; **reste à faire par la personne** : créer un token à portée fine par téléphone, ajouter la compagne comme collaboratrice du dépôt privé, valider à deux téléphones, voir « Mise en service » ci-dessous).
 - [ ] Phase 6 : socle multi-voyage, Google
 
-Fait savoir : les données sont stockées **par navigateur et par appareil** (IndexedDB), y compris les photos et PDF (base `vantravel-docs`, embarqués dans la sauvegarde v3). Tant que la phase 5 n'est pas là, le seul pont entre appareils est le fichier de sauvegarde (bibliothèque, boutons Exporter et Importer).
+Fait savoir : les données sont stockées **par navigateur et par appareil** (IndexedDB), y compris les photos et PDF (base `vantravel-docs`, embarqués dans la sauvegarde v3). Le pont entre appareils est la synchro (dépôt privé) ; le fichier de sauvegarde reste le plan B.
 
 ## Conventions de travail
 
@@ -96,14 +96,22 @@ Retour terrain : « navigation bloquée » dans Safari sur iPhone, installation 
 
 Objectif : deux téléphones, un même voyage, sans base de données.
 
-- [ ] `src/services/github-repo.ts` : client API Contents (GET avec `sha`, PUT avec `sha` pour le verrou optimiste, gestion 409 par relecture et fusion). Token à portée fine (un dépôt, permission contenu) saisi une fois, stocké dans IndexedDB, jamais dans le code ni dans le bundle.
-- [ ] Écran « Compte et synchro » : coller le token, tester, choisir le voyage dans `trips/index.json`, afficher l'état (dernière synchro, en attente, conflit).
-- [ ] Modèle de fusion dans `src/lib/merge.ts` : dernière écriture gagne par entité (`updatedAt`), suppression tombstone, test Vitest exhaustif.
-- [ ] File d'écritures hors ligne (IndexedDB), rejouée au retour du réseau (`online`, `visibilitychange`), un fichier par entité volumineuse (`bookings.json`, `expenses.json`, `docs/<id>`), pour limiter les conflits.
-- [ ] Chiffrement optionnel des codes d'accès : enveloppe `secure` AES-GCM, clé dérivée d'une phrase partagée (PBKDF2, WebCrypto), activable dans « Compte et synchro ».
-- [ ] Côté dépôt privé : ajouter la compagne comme collaboratrice, structure `trips/<id>/{trip.json,bookings.json,expenses.json,checklists.json,docs/}` documentée dans `trips/README.md`.
+- [x] `src/services/github-repo.ts` : client API Contents (GET avec `sha`, contenu brut au-delà de 1 Mo, PUT avec `sha`, `GitHubError.isConflict` sur 409 et 422, délai 20 s), testé avec `fetch` simulé. Token à portée fine stocké dans IndexedDB (`src/store/sync-store.ts`), jamais dans le code ni le bundle.
+- [x] Écran « Compte et synchro » (`src/components/sync/sync-dialog.tsx`, bouton d'état `sync-status-button.tsx` dans les en-têtes Planifier et Voyager et sur l'écran de démarrage) : coller le token, tester l'accès et lister `trips/index.json`, choisir le voyage, synchroniser, automatique ou non, oublier le token. État : dernière synchro, en attente, erreur, dernier rapport.
+- [x] Modèle de fusion dans `src/lib/sync-model.ts` (pas `merge.ts`) : dernière écriture gagne par entité, pierres tombales (`tombstones` sur le snapshot, schéma v3), notes et météo horodatées (`notesAt`, `weatherAt`), itinéraire en fichier entier tranché par date (`decideItinerary`), extraction et réinjection dans le snapshot. Tests Vitest.
+- [x] Hors ligne : **écart au plan**, pas de journal d'écritures : l'état local (IndexedDB) porte les modifications, `pending` reste levé et la passe repart sur `online`, au premier plan et toutes les dix minutes (`startSyncScheduler`). Résultat identique pour deux personnes, moins de code. Fichiers : `itinerary.json`, `travel.json` (réservations, documents, checklist, notes), `expenses.json`, `docs/<id>.<ext>`.
+- [x] Chiffrement optionnel des codes d'accès (`src/lib/secure.ts`, testé) : AES-GCM 256, PBKDF2 depuis la phrase saisie dans « Compte et synchro » ; `accessCodeSecure` dans le dépôt, « code chiffré » sur l'appareil sans phrase.
+- [x] Côté dépôt privé : structure documentée dans `trips/README.md` (modifié localement dans `../vanTravel`, à commiter là-bas). **À faire par la personne** : ajouter la compagne comme collaboratrice, un token par téléphone.
 
-Critère : une réservation saisie sur un téléphone apparaît sur l'autre après retour du réseau, sans écraser une modification faite entre-temps.
+Critère : une réservation saisie sur un téléphone apparaît sur l'autre après retour du réseau, sans écraser une modification faite entre-temps. **À valider sur les deux téléphones.**
+
+### Mise en service (à faire par la personne)
+
+1. Dépôt privé `vanTravel` : Settings → Collaborators → ajouter le compte GitHub de la compagne (elle accepte l'invitation).
+2. Chaque personne, sur son téléphone : GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate. Resource owner : le compte qui possède `vanTravel` (pour la compagne : « Only select repositories » n'apparaît que si le dépôt lui est accessible ; sinon le propriétaire crée un token pour elle). Repository access : `vanTravel` seul. Permissions : Contents → Read and write. Expiration : après la fin du voyage.
+3. Dans l'app (bouton nuage) : compte, dépôt, coller le token, « Tester et lister les voyages », « Utiliser » le voyage. Sur le PC où l'itinéraire a été planifié, la première passe envoie `itinerary.json` ; sur le téléphone vierge, elle le reçoit.
+4. Optionnel : même phrase de chiffrement sur les deux téléphones.
+5. Test croisé : une réservation sur un téléphone, réseau coupé sur l'autre, saisie d'une dépense, retour du réseau : les deux voient tout.
 
 ## Phase 6 : socle multi-voyage et Google (quand le besoin vient)
 

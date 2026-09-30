@@ -6,7 +6,7 @@ import { DEFAULT_VEHICLE, START_STOP_ID, STORAGE_KEY } from "@/lib/constants";
 import { eachDateInclusive, formatDayLabel } from "@/lib/format";
 import { freezeSnapshot } from "@/lib/freeze";
 import { newId } from "@/lib/geo";
-import { SNAPSHOT_SCHEMA_VERSION, normalizeDays, normalizeStops } from "@/lib/migrations";
+import { SNAPSHOT_SCHEMA_VERSION, normalizeDays, normalizeStops, normalizeTombstones } from "@/lib/migrations";
 import { createTravelSlice, type TravelSlice } from "@/store/travel-slice";
 import { configFromSnapshot, isTripConfig, tripDates } from "@/lib/trip-config";
 import { normalizeMarks } from "@/lib/trip-marks";
@@ -26,6 +26,10 @@ import type {
 } from "@/lib/types";
 import { routeBetween } from "@/services/routing";
 
+export type SyncPatch = Partial<
+  Pick<TripState, "config" | "days" | "stops" | "legs" | "customPins" | "currentDayIndex" | "frozenAt" | "marks" | "tombstones">
+> & { activeSavedName?: string | null };
+
 export type TripState = TravelSlice & {
   /** Le voyage courant (dates, départ, véhicule, hébergements). `null` : rien de chargé. */
   config: TripConfig | null;
@@ -43,7 +47,14 @@ export type TripState = TravelSlice & {
   activeSavedName: string | null;
   marks: TripMark[];
   frozenAt: string | null;
+  /** Suppressions en voyage (id -> date ISO), pour la synchro. */
+  tombstones: Record<string, string>;
   setTripConfig: (config: TripConfig, options?: { reset?: boolean }) => void;
+  /**
+   * Applique le résultat d'une synchronisation en une seule écriture. `config` optionnel : posé quand
+   * le voyage vient du dépôt privé. Les champs absents ne bougent pas.
+   */
+  applySync: (patch: SyncPatch) => void;
   freezeItinerary: () => void;
   unfreezeItinerary: () => void;
   addPlace: (place: PlaceInput) => Promise<void>;
@@ -131,6 +142,7 @@ function initialTrip(config: TripConfig | null) {
     activeSavedName: null as string | null,
     marks: [] as TripMark[],
     frozenAt: null as string | null,
+    tombstones: {} as Record<string, string>,
   };
 }
 
@@ -200,6 +212,23 @@ export const useTripStore = create<TripState>()(
       },
 
       unfreezeItinerary: () => set({ frozenAt: null }),
+
+      applySync: (patch) => {
+        set((prev) => ({
+          ...(patch.config !== undefined ? { config: patch.config } : {}),
+          ...(patch.days ? { days: normalizeDays(patch.days) } : {}),
+          ...(patch.stops ? { stops: normalizeStops(patch.stops) } : {}),
+          ...(patch.legs ? { legs: patch.legs } : {}),
+          ...(patch.customPins ? { customPins: patch.customPins } : {}),
+          ...(patch.currentDayIndex !== undefined ? { currentDayIndex: patch.currentDayIndex } : {}),
+          ...(patch.frozenAt !== undefined ? { frozenAt: patch.frozenAt } : {}),
+          ...(patch.marks ? { marks: normalizeMarks(patch.marks) } : {}),
+          ...(patch.tombstones ? { tombstones: normalizeTombstones(patch.tombstones) } : {}),
+          ...(patch.activeSavedName !== undefined ? { activeSavedName: patch.activeSavedName } : {}),
+          pendingLegId: null,
+          routingStatus: prev.routingStatus === "loading" ? prev.routingStatus : "idle",
+        }));
+      },
 
       addPlace: async (place) => {
         const state = get();
@@ -455,6 +484,7 @@ export const useTripStore = create<TripState>()(
           activeSavedName: trip.name,
           marks: normalizeMarks(trip.marks),
           frozenAt: typeof trip.frozenAt === "string" ? trip.frozenAt : null,
+          tombstones: normalizeTombstones(trip.tombstones),
           pinMode: false,
           pendingLegId: null,
           routingStatus: "idle",
@@ -532,6 +562,7 @@ export const useTripStore = create<TripState>()(
         activeSavedName: state.activeSavedName,
         marks: state.marks,
         frozenAt: state.frozenAt,
+        tombstones: state.tombstones,
         uiMode: state.uiMode,
       }),
       merge: (persisted, current) => {
@@ -541,6 +572,7 @@ export const useTripStore = create<TripState>()(
           ...p,
           config: isTripConfig(p.config) ? p.config : null,
           frozenAt: typeof p.frozenAt === "string" ? p.frozenAt : null,
+          tombstones: normalizeTombstones(p.tombstones),
           uiMode: p.uiMode === "plan" || p.uiMode === "travel" ? p.uiMode : null,
           layers: { ...initialLayers, ...(p.layers ?? {}) },
           marks: normalizeMarks(p.marks),
@@ -565,6 +597,7 @@ export function currentSnapshot(state: {
   customPins: PlaceInput[];
   currentDayIndex: number;
   frozenAt?: string | null;
+  tombstones?: Record<string, string>;
 }): TripSnapshot {
   return {
     days: state.days,
@@ -573,6 +606,7 @@ export function currentSnapshot(state: {
     customPins: state.customPins,
     currentDayIndex: state.currentDayIndex,
     frozenAt: state.frozenAt ?? null,
+    tombstones: state.tombstones ?? {},
   };
 }
 

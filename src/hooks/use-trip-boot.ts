@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { syncNow } from "@/services/sync";
 import { loadDevTrip } from "@/services/trip-source";
+import { ensureSyncHydrated, isSyncConfigured, useSyncStore } from "@/store/sync-store";
 import { useTripStore } from "@/store/trip-store";
 
 /**
- * Réhydrate le brouillon (IndexedDB) puis, en dev seulement, charge le voyage du dépôt privé
- * si rien n'est encore chargé. Partagé par l'écran principal et le roadbook.
+ * Réhydrate le brouillon (IndexedDB) puis, sans voyage chargé : synchro depuis le dépôt privé si elle
+ * est configurée, sinon en dev le voyage servi sous /__private/. Partagé par l'écran principal et le roadbook.
  */
 export function useTripBoot(): boolean {
   const [ready, setReady] = useState(false);
@@ -12,7 +14,13 @@ export function useTripBoot(): boolean {
   useEffect(() => {
     let cancelled = false;
     const boot = async () => {
-      await Promise.resolve(useTripStore.persist.rehydrate());
+      await Promise.all([Promise.resolve(useTripStore.persist.rehydrate()), ensureSyncHydrated()]);
+      if (!useTripStore.getState().config) {
+        if (isSyncConfigured(useSyncStore.getState().settings)) {
+          // Nouvel appareil déjà configuré : le voyage et l'itinéraire viennent du dépôt.
+          await syncNow("démarrage");
+        }
+      }
       if (!useTripStore.getState().config) {
         const dev = await loadDevTrip();
         if (dev && !cancelled) {

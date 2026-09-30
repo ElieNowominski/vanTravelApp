@@ -24,7 +24,7 @@ Contraintes : aucun coût récurrent, fonctionnement hors ligne, données person
 | Données personnelles | Dépôt GitHub **privé**, lu et écrit depuis l'app via l'API Contents avec un token à portée fine par personne | Gist secret (pas de binaire propre pour les documents), fichiers injectés au build (publics au runtime), base de données gratuite (pause après inactivité, compte tiers) |
 | Identité | Un compte GitHub par personne, collaboratrice sur le dépôt privé ; profil local (prénom, couleur) ; `updatedBy` sur chaque entité | Système de comptes maison (exige un serveur) |
 | Stockage local | IndexedDB pour la bibliothèque **et** le brouillon zustand (`idb-storage.ts`) ; localStorage seulement en repli | localStorage seul (5 Mo, synchrone) |
-| Synchronisation | Dernière écriture gagne par entité (`updatedAt`), verrou optimiste via le `sha` de l'API GitHub, file d'attente hors ligne | CRDT (surdimensionné pour deux personnes) |
+| Synchronisation | Dernière écriture gagne par entité (`updatedAt`) avec pierres tombales, verrou optimiste via le `sha` de l'API GitHub (409 = relire, fusionner, réessayer), état local comme file d'attente : rien de spécial hors ligne, la passe repart au retour du réseau (`src/lib/sync-model.ts` pur et testé, `src/services/sync.ts`, `src/services/github-repo.ts`) | CRDT (surdimensionné pour deux personnes) ; journal d'opérations rejoué (plus de code pour le même résultat entre deux personnes) |
 | Chiffrement | Optionnel, prévu en v2 : enveloppe `secure` chiffrée côté client (WebCrypto AES-GCM) pour les codes d'accès | Chiffrer tout dès la v1 |
 | Hors ligne | vite-plugin-pwa : précache de l'app, des polices, du catalogue et des jeux de données ; runtime cache pour les tuiles déjà vues | Préchargement de tuiles OSM (interdit par la politique d'usage) |
 | Carte hors ligne | Liens vers Google Maps et Apple Plans pour la navigation ; tracés stockés avec l'itinéraire donc visibles hors ligne | Tuiles vectorielles auto-hébergées (à réévaluer si besoin réel) |
@@ -46,12 +46,31 @@ Le contenu des documents (photos compressées à ~300 Ko, PDF jusqu'à 2 Mo) vit
 
 Mode d'affichage : Voyager par défaut quand la date du jour dans le fuseau de la région tombe dans le voyage, ou dès que l'itinéraire est figé ; le choix explicite (`uiMode`) prend le dessus (`src/lib/voyager.ts`).
 
+Schéma stocké **v3** (phase 5) : snapshot += `tombstones` (id -> date de suppression, posées par les actions de suppression du mode Voyager) ; étape += `notesAt` ; jour += `notesAt`, `weatherAt` ; réservation += `accessCodeSecure`.
+
+## Synchronisation (phase 5)
+
+Trois fichiers JSON par voyage dans le dépôt privé, à côté de `trip.json` écrit à la main :
+
+| Fichier | Contenu | Règle de fusion |
+| --- | --- | --- |
+| `trips/<id>/itinerary.json` | jours, étapes (sans données de voyage), tronçons, pins, figeage, plus et moins, `updatedAt`, `updatedBy` | fichier entier : la modification structurelle la plus récente gagne (`decideItinerary`), les données de voyage locales des étapes connues sont conservées |
+| `trips/<id>/travel.json` | par étape : réservations, documents (métadonnées), checklist, notes ; par date : notes, météo ; pierres tombales | par entité : `updatedAt` le plus récent gagne ; une pierre tombale plus récente que l'entité l'efface |
+| `trips/<id>/expenses.json` | dépenses à plat (chacune porte sa date), pierres tombales | par entité, fichier à part car les deux personnes en saisissent en même temps |
+| `trips/<id>/docs/<docId>.<ext>` | contenu des photos et PDF | présent ou absent : envoyé si manquant à distance, téléchargé si manquant en local |
+
+Une passe (`syncNow`) : lecture des trois fichiers avec leur `sha`, fusion avec l'état local, application au store en une écriture (`applySync`), envoi de ce qui diffère avec le `sha` lu. Un 409 relance la passe entière (idempotente), trois tentatives. Les écritures de la synchro ne relèvent pas `pending`. Déclencheurs : modification du brouillon (4 s de délai), `online`, retour au premier plan, toutes les dix minutes, ouverture de l'app.
+
+Réglages par appareil dans IndexedDB (`vantravel-sync-v1`) : compte, dépôt, branche, token à portée fine (un dépôt, Contents en écriture), voyage choisi dans `trips/index.json`, phrase de chiffrement. Le token ne part qu'en en-tête vers `api.github.com`.
+
+Chiffrement optionnel des codes d'accès (`src/lib/secure.ts`) : AES-GCM 256, clé PBKDF2 (310 000 itérations, SHA-256) dérivée de la phrase, enveloppe `v1.<sel>.<iv>.<chiffré>`. Dans le dépôt, `accessCodeSecure` remplace `accessCode` ; un appareil sans la phrase garde l'enveloppe et affiche « code chiffré ». L'enveloppe existante est réutilisée tant que le code ne change pas, pour ne pas réécrire le fichier à chaque passe.
+
 ## Flux des données au démarrage
 
 1. Réhydratation du brouillon (IndexedDB, `useTripBoot`), puis choix du mode (Planifier ou Voyager).
 2. Sans voyage chargé, en dev : lecture de `/__private/trips/index.json` puis du premier `trip.json` (plugin Vite `privateDataPlugin`).
 3. Toujours sans voyage : écran de démarrage (`TripSetupScreen`) : importer une sauvegarde, rouvrir un circuit de la bibliothèque, créer un voyage neuf.
-4. Phase 5 : lecture du dépôt privé via l'API GitHub avec le token de l'appareil.
+4. Sans voyage mais synchro configurée (nouvel appareil) : `syncNow("démarrage")` lit `trip.json` puis l'itinéraire et les données de voyage du dépôt privé.
 
 ## Phases
 
@@ -59,5 +78,5 @@ Mode d'affichage : Voyager par défaut quand la date du jour dans le fuseau de l
 2. Statique : entité `Trip`, migration Vite, suppression des routes API, données générées au build, déploiement Pages, PWA de base. **Fait dans ce dépôt.**
 3. Hors ligne : bandeau d'état réseau, invite d'installation, allègement du stockage (une seule géométrie par tronçon une fois l'itinéraire figé). **Fait.**
 4. Mode Voyager : réservations, documents, checklists, dépenses, écran « Aujourd'hui », roadbook imprimable, refonte mobile, suppression de `window.confirm`. **Fait, à valider sur téléphone.**
-5. Synchronisation : dépôt privé via API GitHub, token par personne, fusion, file hors ligne.
+5. Synchronisation : dépôt privé via API GitHub, token par personne, fusion, reprise au retour du réseau. **Fait, à valider à deux téléphones.**
 6. Socle multi-voyage et enrichissement Google.

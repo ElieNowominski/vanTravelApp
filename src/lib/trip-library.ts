@@ -57,6 +57,7 @@ export function buildSavedTrip(
     customPins: structuredClone(snapshot.customPins),
     currentDayIndex: snapshot.currentDayIndex,
     frozenAt: snapshot.frozenAt ?? null,
+    tombstones: { ...(snapshot.tombstones ?? {}) },
   };
 }
 

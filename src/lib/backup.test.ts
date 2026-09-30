@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SNAPSHOT_SCHEMA_VERSION } from "@/lib/migrations";
 import { parseBackup } from "@/lib/backup";
 
 const day = {
@@ -104,7 +105,7 @@ describe("documents dans la sauvegarde (v3)", () => {
     );
     expect(backup.savedTrips[0].stops.s1.bookings).toEqual([]);
     expect(backup.savedTrips[0].days[0].expenses).toEqual([]);
-    expect(backup.savedTrips[0].schemaVersion).toBe(2);
+    expect(backup.savedTrips[0].schemaVersion).toBe(SNAPSHOT_SCHEMA_VERSION);
     expect(backup.draft).toBeNull();
   });
 });

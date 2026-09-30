@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
+import { isSyncConfigured, useSyncStore } from "@/store/sync-store";
 
 type Phase = "online" | "offline" | "back-online";
 
@@ -11,6 +12,7 @@ export function NetworkBanner() {
   const [phase, setPhase] = useState<Phase>(() =>
     typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "online",
   );
+  const pendingSync = useSyncStore((s) => s.pending && isSyncConfigured(s.settings));
 
   useEffect(() => {
     let timer: number | null = null;
@@ -47,7 +49,9 @@ export function NetworkBanner() {
       ) : (
         <>
           <WifiOff className="size-3.5" aria-hidden />
-          Hors ligne : l’itinéraire, les nuits et les fiches restent disponibles.
+          {pendingSync
+            ? "Hors ligne : tout reste disponible, les modifications partiront au retour du réseau."
+            : "Hors ligne : l’itinéraire, les nuits et les fiches restent disponibles."}
         </>
       )}
     </div>

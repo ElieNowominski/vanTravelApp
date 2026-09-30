@@ -4,7 +4,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DirectionsButtons } from "@/components/voyager/directions-buttons";
-import { SecretField } from "@/components/voyager/secret-field";
+import { LockedSecret, SecretField } from "@/components/voyager/secret-field";
 import { useDraftField } from "@/hooks/use-draft-field";
 import { formatDayDrive, isRestDay } from "@/lib/format";
 import type { Vehicle } from "@/lib/types";
@@ -102,7 +102,11 @@ export function TodayCard({
                     <span className="text-muted-foreground">sans référence</span>
                   )}
                 </p>
-                {tonightBooking.accessCode && <SecretField label="Code d’accès" value={tonightBooking.accessCode} />}
+                {tonightBooking.accessCode ? (
+                  <SecretField label="Code d’accès" value={tonightBooking.accessCode} />
+                ) : tonightBooking.accessCodeSecure ? (
+                  <LockedSecret label="Code d’accès" />
+                ) : null}
                 {tonightBooking.address && <p className="text-sm">{tonightBooking.address}</p>}
               </div>
             ) : (

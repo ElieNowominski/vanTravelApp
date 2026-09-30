@@ -17,6 +17,10 @@ Dépôt jumeau **privé** : `../vanTravel` (`C:/Users/enowo/Documents/Projects/v
 9. **Port de dev 43217** : le libérer après tout test (voir `.cursor/rules/liberer-port-dev.mdc`).
 10. **Git : commits directement sur `main`**, hotfix compris. Une seule personne travaille ici et chaque push déploie sur Pages. Pas de branche ni de PR sauf demande explicite. Avant chaque commit : lint, typecheck, tests, et le contrôle « aucune donnée perso » de `.cursor/rules/donnees-perso-et-securite.mdc`.
 
+## Synchro (phase 5)
+
+Modèle pur dans `src/lib/sync-model.ts` (fusion, extraction, réinjection, décision itinéraire), moteur dans `src/services/sync.ts`, client GitHub dans `src/services/github-repo.ts`, réglages et token dans `src/store/sync-store.ts` (IndexedDB). Toute suppression d'entité Voyager passe par une pierre tombale (`tombstones`), toute note ou météo par un horodatage (`notesAt`, `weatherAt`) : sans ça, la fusion ressuscite ou écrase. Les écritures venues de la synchro passent par `applySync` et ne relèvent pas `pending`. Détails : `docs/ARCHITECTURE.md`, section Synchronisation.
+
 ## Commandes
 
 ```bash

@@ -22,6 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { ConfirmAction } from "@/components/confirm-action";
 import { InstallButton } from "@/components/install-button";
 import { ModeSwitch } from "@/components/mode-switch";
+import { SyncStatusButton } from "@/components/sync/sync-status-button";
 import { TripLibraryButton } from "@/components/trip-library-dialog";
 import { TripMarksEditor } from "@/components/trip-marks-editor";
 import { StopActivitiesEditor } from "@/components/stop-activities-editor";
@@ -170,6 +171,7 @@ export function ItineraryPanel() {
             }}
           />
           <TripLibraryButton />
+          <SyncStatusButton />
           <InstallButton />
           <Link
             to="/comparer"

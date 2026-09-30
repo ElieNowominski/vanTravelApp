@@ -6,6 +6,7 @@ import {
   normalizeBookings,
   normalizeChecklist,
   normalizeExpenses,
+  normalizeTombstones,
 } from "@/lib/migrations";
 
 /** Circuit tel qu'enregistré par la version 1 (aucun champ Voyager). */
@@ -77,6 +78,23 @@ describe("migrateSnapshot", () => {
     });
     const twice = migrateSnapshot(once);
     expect(twice).toEqual(once);
+  });
+
+  it("v3 : pierres tombales et horodatages des notes, absents avant", () => {
+    const out = migrateSnapshot(v1 as unknown as Partial<TripSnapshot>);
+    expect(out.tombstones).toEqual({});
+    expect(out.stops.s1.notesAt).toBeUndefined();
+    expect(out.days[0].notesAt).toBeUndefined();
+    expect(out.days[0].weatherAt).toBeUndefined();
+
+    const withV3 = migrateSnapshot({
+      ...v1,
+      tombstones: { "booking-1": "2026-09-30T08:00:00.000Z", bad: 12, "": "x" },
+      days: [{ ...v1.days[0], notes: "Vent", notesAt: "2026-09-30T07:00:00.000Z" }],
+    } as unknown as Partial<TripSnapshot>);
+    expect(withV3.tombstones).toEqual({ "booking-1": "2026-09-30T08:00:00.000Z" });
+    expect(withV3.days[0].notesAt).toBe("2026-09-30T07:00:00.000Z");
+    expect(normalizeTombstones("nope")).toEqual({});
   });
 
   it("tolère des jours et étapes incomplets", () => {

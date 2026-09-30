@@ -1,6 +1,19 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Lock } from "lucide-react";
 import { maskSecret } from "@/lib/voyager";
+
+/** Code reçu chiffré sans la phrase sur cet appareil : on le dit, sans rien montrer. */
+export function LockedSecret({ label }: { label: string }) {
+  return (
+    <p className="inline-flex min-h-11 w-full items-center justify-between gap-3 rounded-lg bg-muted px-3 text-left">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Lock className="size-3.5" aria-hidden />
+        Chiffré : phrase à saisir dans « Compte et synchro »
+      </span>
+    </p>
+  );
+}
 
 /** Code d'accès masqué par défaut, révélé au toucher, re-masqué après 20 s. */
 export function SecretField({ label, value }: { label: string; value: string }) {

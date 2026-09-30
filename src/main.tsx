@@ -10,6 +10,7 @@ import {
   reportNeedRefresh,
   reportOfflineReady,
 } from "./services/app-update";
+import { startSyncScheduler } from "./services/sync";
 
 // Mode « prompt » : la nouvelle version s'installe en arrière-plan et attend un toucher sur
 // « Mettre à jour » (bannière), pour ne jamais recharger la page pendant une saisie en voyage.
@@ -28,6 +29,8 @@ answerUpdateCapabilityProbes();
 // Stockage durable quand le navigateur le propose (Chromium) : IndexedDB survit à la pression disque.
 // Safari ne l'expose pas ; là, c'est l'installation sur l'écran d'accueil qui protège les données.
 void navigator.storage?.persist?.().catch(() => undefined);
+// Synchro entre appareils (dépôt privé) : à chaque modification, au retour du réseau, au premier plan.
+startSyncScheduler();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

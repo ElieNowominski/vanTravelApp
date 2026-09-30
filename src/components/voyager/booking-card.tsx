@@ -2,7 +2,7 @@ import { ExternalLink, Pencil, Phone, Trash2 } from "lucide-react";
 import { ConfirmAction } from "@/components/confirm-action";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { DirectionsButtons } from "@/components/voyager/directions-buttons";
-import { SecretField } from "@/components/voyager/secret-field";
+import { LockedSecret, SecretField } from "@/components/voyager/secret-field";
 import { formatMoney } from "@/lib/expenses";
 import type { Booking } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,11 @@ export function BookingCard({
         )}
       </header>
 
-      {booking.accessCode && <SecretField label="Code d’accès" value={booking.accessCode} />}
+      {booking.accessCode ? (
+        <SecretField label="Code d’accès" value={booking.accessCode} />
+      ) : booking.accessCodeSecure ? (
+        <LockedSecret label="Code d’accès" />
+      ) : null}
 
       {(booking.checkIn || booking.checkOut) && (
         <p className="text-xs text-muted-foreground">

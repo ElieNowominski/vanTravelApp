@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
-import { FolderOpen, MapPinned, Upload } from "lucide-react";
+import { Cloud, FolderOpen, MapPinned, Upload } from "lucide-react";
+import { SyncStatusButton } from "@/components/sync/sync-status-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -100,6 +101,22 @@ export function TripSetupScreen() {
           {status}
         </p>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Cloud className="size-4" />
+            Depuis le dépôt privé
+          </CardTitle>
+          <CardDescription>
+            Le voyage partagé sur GitHub : colle ton token, choisis le voyage, tout arrive ici et reste synchronisé avec l’autre
+            téléphone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SyncStatusButton variant="full" />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

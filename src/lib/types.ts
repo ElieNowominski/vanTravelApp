@@ -46,6 +46,11 @@ export type Booking = EntityMeta & {
   reference?: string;
   /** Code d'accès, portail, boîte à clés : masqué par défaut à l'écran. */
   accessCode?: string;
+  /**
+   * Code chiffré (enveloppe AES-GCM, `src/lib/secure.ts`) tel qu'il voyage dans le dépôt privé.
+   * Présent sans `accessCode` quand la phrase de déchiffrement manque sur cet appareil.
+   */
+  accessCodeSecure?: string;
   address?: string;
   phone?: string;
   url?: string;
@@ -95,6 +100,8 @@ export type Stop = PlaceInput & {
   bookings: Booking[];
   documents: TripDocument[];
   checklist: ChecklistItem[];
+  /** Horodatage ISO de la dernière écriture de `notes` en voyage (fusion « dernière écriture gagne »). */
+  notesAt?: string;
 };
 
 export type RouteOption = {
@@ -125,8 +132,10 @@ export type TripDay = {
   stopIds: string[];
   /** Notes du jour saisies en voyage. */
   notes?: string;
+  notesAt?: string;
   /** Météo notée à la main (« grand soleil, vent l'après-midi »). */
   weather?: string;
+  weatherAt?: string;
   expenses: Expense[];
 };
 
@@ -153,6 +162,11 @@ export type TripSnapshot = {
   currentDayIndex: number;
   /** Date ISO du figeage de l'itinéraire (une géométrie par tronçon) ; `null` tant qu'on planifie. */
   frozenAt?: string | null;
+  /**
+   * Suppressions en voyage (réservation, document, coche, dépense) : id -> date ISO.
+   * Sans elles, la synchro ferait renaître l'entité depuis l'autre appareil.
+   */
+  tombstones?: Record<string, string>;
 };
 
 export type TripMarkKind = "plus" | "minus";

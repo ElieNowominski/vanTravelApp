@@ -18,10 +18,12 @@ import type {
  * 1 : circuits d'origine (jours, étapes, tronçons, pins, activités, plus et moins).
  * 2 : mode Voyager. Étape += `bookings`, `documents`, `checklist` ; jour += `expenses`, `notes`, `weather` ;
  *     snapshot += `frozenAt`. Chaque entité porte `id`, `updatedAt`, `updatedBy`.
+ * 3 : synchronisation. Snapshot += `tombstones` (id -> date de suppression) ; étape += `notesAt` ;
+ *     jour += `notesAt`, `weatherAt` ; réservation += `accessCodeSecure` (code chiffré).
  *
  * La migration est idempotente : on peut la passer sur des données déjà à jour.
  */
-export const SNAPSHOT_SCHEMA_VERSION = 2;
+export const SNAPSHOT_SCHEMA_VERSION = 3;
 
 export const EXPENSE_CATEGORY_IDS: ExpenseCategory[] = [
   "carburant",
@@ -70,6 +72,7 @@ export function normalizeBookings(value: unknown): Booking[] {
         provider,
         reference: str(item.reference),
         accessCode: str(item.accessCode),
+        accessCodeSecure: str(item.accessCodeSecure),
         address: str(item.address),
         phone: str(item.phone),
         url: str(item.url),
@@ -142,7 +145,18 @@ export function migrateStop(stop: Partial<Stop> & Record<string, unknown>): Stop
     bookings: normalizeBookings(stop.bookings),
     documents: normalizeDocuments(stop.documents),
     checklist: normalizeChecklist(stop.checklist),
+    notesAt: str(stop.notesAt),
   };
+}
+
+/** Pierres tombales : id -> date ISO, tout le reste est ignoré. */
+export function normalizeTombstones(value: unknown): Record<string, string> {
+  if (!isRecord(value)) return {};
+  const out: Record<string, string> = {};
+  for (const [id, at] of Object.entries(value)) {
+    if (id && typeof at === "string" && at) out[id] = at;
+  }
+  return out;
 }
 
 export function normalizeStops(stops: Record<string, Stop> | undefined | null): Record<string, Stop> {
@@ -165,7 +179,9 @@ export function migrateDay(day: Partial<TripDay> & Record<string, unknown>): Tri
     overnightStopId: typeof day.overnightStopId === "string" ? day.overnightStopId : null,
     stopIds: Array.isArray(day.stopIds) ? day.stopIds.filter((id): id is string => typeof id === "string") : [],
     notes: str(day.notes),
+    notesAt: str(day.notesAt),
     weather: str(day.weather),
+    weatherAt: str(day.weatherAt),
     expenses: normalizeExpenses(day.expenses, date),
   };
 }
@@ -189,5 +205,6 @@ export function migrateSnapshot<T extends Partial<TripSnapshot>>(raw: T): T & Tr
     customPins: Array.isArray(raw.customPins) ? raw.customPins : [],
     currentDayIndex: typeof raw.currentDayIndex === "number" ? raw.currentDayIndex : 0,
     frozenAt: typeof raw.frozenAt === "string" ? raw.frozenAt : null,
+    tombstones: normalizeTombstones(raw.tombstones),
   };
 }
