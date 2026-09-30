@@ -55,7 +55,8 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="profile-name">Mon prénom</Label>
-            <Input id="profile-name" className="h-11" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            {/* Pas d'autoFocus : sur iOS le clavier s'ouvrirait avant l'affichage et décalerait la page. */}
+            <Input id="profile-name" className="h-11" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="profile-partner">Prénom de l’autre personne</Label>

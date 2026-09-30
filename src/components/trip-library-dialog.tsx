@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { backupFilename, buildBackup, downloadJson, parseBackup, restoreBackup } from "@/lib/backup";
+import { backupFilename, buildBackup, exportJson, parseBackup, restoreBackup } from "@/lib/backup";
 import { formatKm } from "@/lib/format";
 import { countDroppedOptions, formatBytes, freezeSnapshot, jsonBytes } from "@/lib/freeze";
 import { newId } from "@/lib/geo";
@@ -131,9 +131,13 @@ function TripLibraryDialog({ onOpenChange }: { onOpenChange: (open: boolean) => 
     setBusy(true);
     try {
       const backup = await buildBackup();
-      downloadJson(backupFilename(), backup);
+      const method = await exportJson(backupFilename(), backup);
+      if (method === null) {
+        setStatus("Partage annulé.");
+        return;
+      }
       setStatus(
-        `Sauvegarde téléchargée : circuit affiché + ${backup.savedTrips.length} circuit${
+        `Sauvegarde ${method === "share" ? "partagée" : "téléchargée"} : circuit affiché + ${backup.savedTrips.length} circuit${
           backup.savedTrips.length > 1 ? "s" : ""
         } enregistré${backup.savedTrips.length > 1 ? "s" : ""}.`,
       );

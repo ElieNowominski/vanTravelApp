@@ -3,6 +3,7 @@ import { configFromSnapshot, isTripConfig } from "@/lib/trip-config";
 import { normalizeMarks } from "@/lib/trip-marks";
 import { migrateSnapshot } from "@/lib/migrations";
 import { blobToDataUrl, dataUrlToBlob, getDocumentBlob, putDocumentBlob } from "@/lib/document-store";
+import { chooseExportMethod, type ExportMethod } from "@/lib/pwa";
 import type { SavedTrip, TripConfig, TripMark, TripSnapshot } from "@/lib/types";
 import { currentSnapshot, useTripStore } from "@/store/trip-store";
 
@@ -96,6 +97,28 @@ export function downloadJson(filename: string, data: unknown): void {
   anchor.click();
   anchor.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * Exporte la sauvegarde : feuille de partage sur iOS (Fichiers, AirDrop vers l'autre téléphone),
+ * téléchargement ailleurs. Résout avec la méthode employée, `null` si le partage a été annulé.
+ */
+export async function exportJson(filename: string, data: unknown): Promise<ExportMethod | null> {
+  const file = new File([JSON.stringify(data, null, 2)], filename, { type: "application/json" });
+  const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
+  const canShareFiles = typeof nav.share === "function" && nav.canShare?.({ files: [file] }) === true;
+  const method = chooseExportMethod({ userAgent: navigator.userAgent, canShareFiles });
+  if (method === "share") {
+    try {
+      await nav.share({ files: [file], title: "Sauvegarde vanTravel" });
+      return "share";
+    } catch (error) {
+      // Annulation par la personne : rien à faire. Autre échec : on retombe sur le téléchargement.
+      if (error instanceof DOMException && error.name === "AbortError") return null;
+    }
+  }
+  downloadJson(filename, data);
+  return "download";
 }
 
 /**

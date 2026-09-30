@@ -1,17 +1,17 @@
 import { useState } from "react";
-import { MapPin, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { BookingCard } from "@/components/voyager/booking-card";
 import { BookingForm } from "@/components/voyager/booking-form";
 import { ChecklistSection } from "@/components/voyager/checklist-section";
+import { DirectionsButtons } from "@/components/voyager/directions-buttons";
 import { DocumentsSection } from "@/components/voyager/documents-section";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useDraftField } from "@/hooks/use-draft-field";
 import { catalogKindLabel } from "@/lib/trip-plan";
 import type { Booking, Stop } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { mapsDirectionsUrl } from "@/lib/voyager";
 import { useTripStore } from "@/store/trip-store";
 
 type Tab = "bookings" | "documents" | "checklist" | "notes";
@@ -69,15 +69,9 @@ function StopSheetBody({ stop, defaultCurrency, initialTab }: { stop: Stop; defa
         </SheetDescription>
       </SheetHeader>
 
-      <a
-        href={mapsDirectionsUrl(stop.lat, stop.lng)}
-        target="_blank"
-        rel="noreferrer"
-        className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-11 w-full")}
-      >
-        <MapPin className="size-4" />
-        Itinéraire dans Google Maps
-      </a>
+      <div className="flex flex-wrap gap-2">
+        <DirectionsButtons lat={stop.lat} lng={stop.lng} primary="outline" />
+      </div>
 
       <div role="tablist" className="flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map((t) => (

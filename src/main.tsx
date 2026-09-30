@@ -25,6 +25,9 @@ const updateSW = registerSW({
 });
 bindServiceWorkerUpdater(updateSW);
 answerUpdateCapabilityProbes();
+// Stockage durable quand le navigateur le propose (Chromium) : IndexedDB survit à la pression disque.
+// Safari ne l'expose pas ; là, c'est l'installation sur l'écran d'accueil qui protège les données.
+void navigator.storage?.persist?.().catch(() => undefined);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

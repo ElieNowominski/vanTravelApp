@@ -29,7 +29,27 @@ export function detectInstallContext(input: {
 
 /** Étapes du guide iOS, dans l'ordre affiché. */
 export const IOS_INSTALL_STEPS = [
-  "Ouvre cette page dans Safari.",
+  "Ouvre cette page dans Safari (pas depuis Chrome ni depuis un lien dans Messages).",
   "Touche le bouton Partager (carré avec une flèche vers le haut).",
   "Choisis « Sur l’écran d’accueil », puis « Ajouter ».",
 ] as const;
+
+/** Pourquoi installer plutôt que rester dans Safari : iOS purge le stockage d'un site non visité pendant 7 jours. */
+export const IOS_INSTALL_NOTE =
+  "Une fois installée, l’app garde ses données. Dans Safari seul, iOS peut effacer le stockage d’un site après 7 jours sans visite.";
+
+export type ExportMethod = "share" | "download";
+
+/**
+ * Sur iOS, un lien `download` vers un blob est peu fiable (en mode installé il peut ouvrir une page
+ * blanche sans retour) : la feuille de partage (Fichiers, AirDrop, Messages) est la voie sûre.
+ * Ailleurs, le téléchargement classique reste attendu.
+ */
+export function chooseExportMethod(input: { userAgent: string; canShareFiles: boolean }): ExportMethod {
+  return isIosUserAgent(input.userAgent) && input.canShareFiles ? "share" : "download";
+}
+
+/** `window.print()` est sans effet dans une web app iOS installée : il faut passer par Safari. */
+export function printNeedsBrowser(input: { userAgent: string; standalone: boolean }): boolean {
+  return input.standalone && isIosUserAgent(input.userAgent);
+}

@@ -4,6 +4,7 @@ import {
   daysBetween,
   defaultMode,
   departureOf,
+  directionsLinks,
   mapsDirectionsUrl,
   maskSecret,
   summarizeDay,
@@ -125,6 +126,13 @@ describe("summarizeDay", () => {
 });
 
 describe("liens et masquage", () => {
+  it("propose Plans avant Google Maps sur iPhone, Google Maps seul ailleurs", () => {
+    const iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari/604.1";
+    expect(directionsLinks(-44, 170, iphone).map((l) => l.label)).toEqual(["Plans", "Google Maps"]);
+    expect(directionsLinks(-44, 170, iphone)[0]?.href).toBe("https://maps.apple.com/?daddr=-44.000000,170.000000");
+    expect(directionsLinks(-44, 170, "Mozilla/5.0 (Linux; Android 14) Chrome/128.0").map((l) => l.label)).toEqual(["Google Maps"]);
+  });
+
   it("construit l'URL Google Maps et le lien tel", () => {
     expect(mapsDirectionsUrl(-44.0, 170.0)).toBe("https://www.google.com/maps/dir/?api=1&destination=-44.000000,170.000000");
     expect(telHref("+64 3 443 0000")).toBe("tel:+6434430000");

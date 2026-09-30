@@ -23,6 +23,7 @@ Prompt de reprise à coller dans une nouvelle session :
 - [x] Phase 2 : Vite, entité `TripConfig`, données au build, PWA de base, GitHub Pages en ligne (29 sept. 2026)
 - [x] Phase 3 : hors ligne solide (29 sept. 2026 : onglets Carte / Itinéraire avec geste retour, bandeau réseau, bouton d'installation, figeage de l'itinéraire, notice de jeux de données, service worker vérifié sous `/vanTravelApp/` ; test Playwright optionnel non fait)
 - [x] Phase 4 : mode Voyager (29 sept. 2026, branche `phase-4-voyager` : schéma v2 migré et testé, écran « Aujourd'hui », fiches étape, dépenses, roadbook, popups React, `window.confirm` purgé). Fusionnée dans `main` (PR #1). **Reste à valider sur téléphone à 390 px et réseau coupé** ; jsPDF conservé jusque-là.
+- [x] Correctifs iPhone (30 sept. 2026, voir « iPhone » ci-dessous) : à **confirmer sur l'iPhone** (Safari puis app installée) car aucun WebKit n'est disponible en session.
 - [ ] Phase 5 : synchronisation entre appareils
 - [ ] Phase 6 : socle multi-voyage, Google
 
@@ -76,6 +77,20 @@ Migration : les circuits existants reçoivent des tableaux vides. Profil local (
 - [x] `window.confirm` purgé (`ConfirmAction` : Plan, ouverture et suppression d'un circuit, figeage, suppressions Voyager) ; popups carte en React (`map-popup.tsx`, `react-popup.ts`, carte de comparaison incluse).
 
 Critère : en voyage, sans réseau, on retrouve en trois touches la nuit du soir, son code et l'itinéraire vers elle.
+
+### iPhone (Safari et web app installée), 30 sept. 2026
+
+Retour terrain : « navigation bloquée » dans Safari sur iPhone, installation laborieuse (réussie via Safari). Sans WebKit en session, les causes ont été cherchées dans le code ; chaque correctif vise un comportement iOS documenté.
+
+- [x] Écran de démarrage (`trip-setup-screen.tsx`) : le `body` ne défile pas, l'écran dépassait la fenêtre sur iPhone (barres Safari) et le bouton « Créer le voyage » était hors de portée. L'écran porte son propre défilement. `select` en 16 px (sinon zoom au focus).
+- [x] Onglets Carte / Itinéraire (`trip-app.tsx`) : l'état affiché ne dépend plus de `popstate` (`history.back()` reste un confort pour le geste retour).
+- [x] Clavier iOS : plus d'`autoFocus` dans le dialogue de profil (ouvert d'office au premier lancement en mode Voyager) ; `useKeyboardScrollReset` remet la page à zéro après la fermeture du clavier.
+- [x] Scope du manifeste : basename du routeur `/vanTravelApp/` (barre finale) pour que « Retour » produise une URL dans le `scope`, sinon la web app installée peut ouvrir Safari ou afficher une barre de navigateur.
+- [x] Sauvegarde : `exportJson` passe par la feuille de partage sur iOS (Fichiers, AirDrop vers l'autre téléphone) ; `<a download>` ailleurs. `chooseExportMethod` testé.
+- [x] Roadbook : en web app iOS installée, `window.print()` est sans effet ; lien « Ouvrir dans Safari pour imprimer ». `printNeedsBrowser` testé.
+- [x] Guidage : Plans proposé avant Google Maps sur iPhone (`directionsLinks` testé, `DirectionsButtons`), Google Maps partout.
+- [x] Guide d'installation : préciser Safari (ni Chrome ni lien ouvert depuis Messages) et pourquoi installer (Safari seul purge le stockage après 7 jours sans visite). `navigator.storage.persist()` demandé au démarrage (Chromium).
+- [ ] À vérifier sur l'iPhone : lancement depuis l'icône, Carte ↔ Itinéraire, fiche étape, export et import d'une sauvegarde, roadbook, réseau coupé. Si la navigation reste bloquée, noter l'écran exact et le geste.
 
 ## Phase 5 : synchronisation entre appareils (2 à 3 jours)
 

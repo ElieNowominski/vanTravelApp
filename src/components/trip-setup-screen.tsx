@@ -83,7 +83,10 @@ export function TripSetupScreen() {
   };
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col gap-5 px-4 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
+    // Le body ne défile pas (`overflow: hidden`) : l'écran porte son propre défilement, sinon le bas
+    // du formulaire est hors de portée sur un petit iPhone.
+    <main className="h-dvh overflow-y-auto overscroll-contain">
+      <div className="mx-auto flex w-full max-w-lg flex-col gap-5 px-4 pt-[calc(1.5rem+env(safe-area-inset-top,0px))] pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))]">
       <header className="flex flex-col gap-1">
         <p className="text-xs tracking-wide text-muted-foreground uppercase">vanTravel</p>
         <h1 className="font-heading text-2xl leading-tight">Aucun voyage chargé sur cet appareil</h1>
@@ -194,7 +197,8 @@ export function TripSetupScreen() {
               id="trip-start-place"
               value={startPlaceId}
               onChange={(e) => setStartPlaceId(e.target.value)}
-              className="h-11 rounded-lg border border-input bg-background px-3 text-sm"
+              // 16 px minimum : en dessous, iOS zoome la page au focus et ne revient pas toujours.
+              className="h-11 rounded-lg border border-input bg-background px-3 text-base"
             >
               {catalog.towns.map((town) => (
                 <option key={town.id} value={town.id}>
@@ -215,6 +219,7 @@ export function TripSetupScreen() {
           PRIVATE_DATA_DIR, fichier trips/index.json).
         </p>
       )}
+      </div>
     </main>
   );
 }

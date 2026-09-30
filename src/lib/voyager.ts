@@ -1,3 +1,4 @@
+import { isIosUserAgent } from "@/lib/pwa";
 import type { Booking, Leg, RouteOption, Stop, TripConfig, TripDay, TripSnapshot } from "@/lib/types";
 
 export type AppMode = "plan" | "travel";
@@ -125,6 +126,18 @@ export function mapsDirectionsUrl(lat: number, lng: number): string {
 /** Apple Plans, pour iPhone. */
 export function appleMapsUrl(lat: number, lng: number): string {
   return `https://maps.apple.com/?daddr=${lat.toFixed(6)},${lng.toFixed(6)}`;
+}
+
+export type DirectionsLink = { label: "Plans" | "Google Maps"; href: string };
+
+/**
+ * Liens de guidage vers un point. Sur iPhone, Plans en premier : l'app s'ouvre directement,
+ * là où le lien Google Maps passe par Safari. Google Maps reste proposé partout.
+ */
+export function directionsLinks(lat: number, lng: number, userAgent: string): DirectionsLink[] {
+  const google: DirectionsLink = { label: "Google Maps", href: mapsDirectionsUrl(lat, lng) };
+  if (isIosUserAgent(userAgent)) return [{ label: "Plans", href: appleMapsUrl(lat, lng) }, google];
+  return [google];
 }
 
 /** `tel:` propre : chiffres et « + » seulement. */

@@ -5,8 +5,10 @@ import { RouteSketchSvg } from "@/components/roadbook/route-sketch-svg";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { useTripBoot } from "@/hooks/use-trip-boot";
 import { DEFAULT_VEHICLE, dayColor } from "@/lib/constants";
+import { printNeedsBrowser } from "@/lib/pwa";
 import { formatMoney, formatTotals, totalsByCurrency } from "@/lib/expenses";
 import { formatDateRange, formatDayDrive, formatDuration, formatKm, isRestDay } from "@/lib/format";
 import { getRegion } from "@/lib/regions";
@@ -28,6 +30,7 @@ export function RoadbookPage() {
   const legs = useTripStore((s) => s.legs);
   const marks = useTripStore((s) => s.marks);
   const activeSavedName = useTripStore((s) => s.activeSavedName);
+  const { context: installContext } = useInstallPrompt();
   const [withCodes, setWithCodes] = useState(false);
   const [withSketch, setWithSketch] = useState(true);
   const snapshot = useMemo(() => ({ days, stops, legs }), [days, stops, legs]);
@@ -69,10 +72,24 @@ export function RoadbookPage() {
             <ArrowLeft className="size-4" />
             Retour
           </Link>
-          <Button className="h-11" onClick={() => window.print()}>
-            <Printer className="size-4" />
-            Imprimer ou enregistrer en PDF
-          </Button>
+          {printNeedsBrowser({ userAgent: navigator.userAgent, standalone: installContext === "installed" }) ? (
+            // Web app iOS installée : `window.print()` est sans effet. Le lien ouvre la page dans Safari,
+            // dont le menu Partager sait imprimer et enregistrer en PDF.
+            <a
+              href={window.location.href}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(buttonVariants({ size: "lg" }), "h-11")}
+            >
+              <Printer className="size-4" />
+              Ouvrir dans Safari pour imprimer
+            </a>
+          ) : (
+            <Button className="h-11" onClick={() => window.print()}>
+              <Printer className="size-4" />
+              Imprimer ou enregistrer en PDF
+            </Button>
+          )}
           <div className="ml-auto flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Switch id="rb-codes" checked={withCodes} onCheckedChange={setWithCodes} />

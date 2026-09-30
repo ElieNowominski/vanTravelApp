@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
-import { IOS_INSTALL_STEPS } from "@/lib/pwa";
+import { IOS_INSTALL_NOTE, IOS_INSTALL_STEPS } from "@/lib/pwa";
 
 /**
  * Bouton « Installer » : invite native quand le navigateur la propose,
@@ -65,6 +65,7 @@ export function InstallButton({ variant = "icon" }: { variant?: "icon" | "full" 
               </li>
             ))}
           </ol>
+          <p className="text-xs text-muted-foreground">{IOS_INSTALL_NOTE}</p>
           <DialogFooter>
             <Button onClick={() => setGuideOpen(false)}>Compris</Button>
           </DialogFooter>

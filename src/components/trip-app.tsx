@@ -48,7 +48,9 @@ export function TripApp() {
 function PlanApp() {
   /**
    * Mobile : deux onglets (carte, itinéraire) plutôt qu'un tiroir modal.
-   * L'onglet itinéraire pousse une entrée d'historique : le geste « retour » du téléphone ramène à la carte.
+   * L'état affiché est la vérité ; l'historique n'est qu'un confort : l'onglet itinéraire pousse une
+   * entrée pour que le geste « retour » du téléphone ramène à la carte. Le toucher sur « Carte »
+   * bascule tout de suite, sans attendre `popstate` (iOS ne le délivre pas toujours en web app installée).
    */
   const [view, setView] = useState<MobileView>(() => viewFromHistory());
 
@@ -59,16 +61,25 @@ function PlanApp() {
   }, []);
 
   const showList = useCallback(() => {
-    if (viewFromHistory() !== "list") window.history.pushState({ view: "list" }, "");
     setView("list");
+    if (viewFromHistory() !== "list") {
+      try {
+        window.history.pushState({ ...(window.history.state as object | null), view: "list" }, "");
+      } catch {
+        /* historique indisponible : l'état local suffit */
+      }
+    }
   }, []);
 
   const showMap = useCallback(() => {
-    if (viewFromHistory() === "list") {
-      window.history.back();
-      return;
-    }
     setView("map");
+    if (viewFromHistory() === "list") {
+      try {
+        window.history.back();
+      } catch {
+        /* idem */
+      }
+    }
   }, []);
 
   return (

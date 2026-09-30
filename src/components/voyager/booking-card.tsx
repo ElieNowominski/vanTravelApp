@@ -1,11 +1,12 @@
-import { ExternalLink, MapPin, Pencil, Phone, Trash2 } from "lucide-react";
+import { ExternalLink, Pencil, Phone, Trash2 } from "lucide-react";
 import { ConfirmAction } from "@/components/confirm-action";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { DirectionsButtons } from "@/components/voyager/directions-buttons";
 import { SecretField } from "@/components/voyager/secret-field";
 import { formatMoney } from "@/lib/expenses";
 import type { Booking } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { mapsDirectionsUrl, telHref } from "@/lib/voyager";
+import { telHref } from "@/lib/voyager";
 
 export function BookingCard({
   booking,
@@ -51,17 +52,7 @@ export function BookingCard({
       {!compact && booking.notes && <p className="text-sm whitespace-pre-line text-muted-foreground">{booking.notes}</p>}
 
       <div className="flex flex-wrap gap-2">
-        {destination && (
-          <a
-            href={mapsDirectionsUrl(destination.lat, destination.lng)}
-            target="_blank"
-            rel="noreferrer"
-            className={cn(buttonVariants({ variant: "default", size: "lg" }), "h-11 flex-1 min-w-36")}
-          >
-            <MapPin className="size-4" />
-            Google Maps
-          </a>
-        )}
+        {destination && <DirectionsButtons lat={destination.lat} lng={destination.lng} />}
         {booking.phone && (
           <a href={telHref(booking.phone)} className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-11 flex-1 min-w-36")}>
             <Phone className="size-4" />

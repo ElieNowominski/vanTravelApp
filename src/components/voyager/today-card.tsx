@@ -3,12 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { DirectionsButtons } from "@/components/voyager/directions-buttons";
 import { SecretField } from "@/components/voyager/secret-field";
 import { useDraftField } from "@/hooks/use-draft-field";
 import { formatDayDrive, isRestDay } from "@/lib/format";
 import type { Vehicle } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { mapsDirectionsUrl, telHref, type DaySummary } from "@/lib/voyager";
+import { directionsLinks, telHref, type DaySummary } from "@/lib/voyager";
 import { useTripStore } from "@/store/trip-store";
 
 /**
@@ -65,7 +66,7 @@ export function TodayCard({
               <p className="truncate text-sm font-medium">{nextStop.name}</p>
             </div>
             <a
-              href={mapsDirectionsUrl(nextStop.lat, nextStop.lng)}
+              href={directionsLinks(nextStop.lat, nextStop.lng, navigator.userAgent)[0]?.href}
               target="_blank"
               rel="noreferrer"
               className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-11 shrink-0")}
@@ -108,15 +109,7 @@ export function TodayCard({
               <p className="mt-2 text-sm text-muted-foreground">Pas de réservation notée.</p>
             )}
             <div className="mt-3 flex flex-wrap gap-2">
-              <a
-                href={mapsDirectionsUrl(overnight.lat, overnight.lng)}
-                target="_blank"
-                rel="noreferrer"
-                className={cn(buttonVariants({ size: "lg" }), "h-11 min-w-36 flex-1")}
-              >
-                <MapPin className="size-4" />
-                Google Maps
-              </a>
+              <DirectionsButtons lat={overnight.lat} lng={overnight.lng} />
               {tonightBooking?.phone ? (
                 <a href={telHref(tonightBooking.phone)} className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-11 min-w-36 flex-1")}>
                   <Phone className="size-4" />
