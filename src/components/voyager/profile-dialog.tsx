@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -61,6 +62,10 @@ export function ProfileDialog({ open, onClose }: { open: boolean; onClose: () =>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="profile-partner">Prénom de l’autre personne</Label>
             <Input id="profile-partner" className="h-11" value={partner} onChange={(e) => setPartner(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <p className="text-sm font-medium">Apparence</p>
+            <ThemeToggle variant="segmented" />
           </div>
           <div className="flex flex-col gap-1.5">
             <p className="text-sm font-medium">Couleur</p>

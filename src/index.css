@@ -135,6 +135,27 @@
   box-shadow: 0 10px 30px rgb(15 23 20 / 0.16);
 }
 
+/* Mode sombre : les popups et contrôles MapLibre suivent les jetons de l'app ; la carte OSM reste claire. */
+.dark .maplibregl-popup-content {
+  background: var(--popover);
+  color: var(--popover-foreground);
+}
+.dark .maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: var(--popover);
+}
+.dark .maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: var(--popover);
+}
+.dark .maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--popover);
+}
+.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--popover);
+}
+.dark .maplibregl-popup-close-button {
+  color: var(--popover-foreground);
+}
+
 .maplibregl-popup-close-button {
   font-size: 16px;
   padding: 4px 8px;

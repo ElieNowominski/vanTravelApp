@@ -3,6 +3,7 @@ import { CompareApp } from "@/components/compare-app";
 import { RoadbookPage } from "@/components/roadbook/roadbook-page";
 import { TripApp } from "@/components/trip-app";
 import { useKeyboardScrollReset } from "@/hooks/use-keyboard-scroll-reset";
+import { useApplyTheme } from "@/hooks/use-theme";
 
 /**
  * Le basename suit le préfixe de déploiement, barre finale comprise (`/vanTravelApp/` sur GitHub Pages) :
@@ -14,6 +15,7 @@ const basename = import.meta.env.BASE_URL;
 
 export function App() {
   useKeyboardScrollReset();
+  useApplyTheme();
   return (
     <BrowserRouter basename={basename}>
       <Routes>

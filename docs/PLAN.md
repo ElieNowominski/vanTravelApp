@@ -25,7 +25,7 @@ Prompt de reprise à coller dans une nouvelle session :
 - [x] Phase 4 : mode Voyager (29 sept. 2026, branche `phase-4-voyager` : schéma v2 migré et testé, écran « Aujourd'hui », fiches étape, dépenses, roadbook, popups React, `window.confirm` purgé). Fusionnée dans `main` (PR #1). **Reste à valider sur téléphone à 390 px et réseau coupé** ; jsPDF conservé jusque-là.
 - [x] Correctifs iPhone (30 sept. 2026, voir « iPhone » ci-dessous) : à **confirmer sur l'iPhone** (Safari puis app installée) car aucun WebKit n'est disponible en session.
 - [x] Phase 5 : synchronisation entre appareils (30 sept. 2026 : code livré et testé unitairement ; **reste à faire par la personne** : créer un token à portée fine par téléphone, ajouter la compagne comme collaboratrice du dépôt privé, valider à deux téléphones, voir « Mise en service » ci-dessous).
-- [ ] Phase 6 : socle multi-voyage, Google
+- [~] Phase 6 : socle multi-voyage, Google (30 sept. 2026 : mode sombre fait, sélecteur couvert par la synchro et la bibliothèque ; Google bloqué sans clé ; découpage de `trip-map.tsx` à faire)
 
 Fait savoir : les données sont stockées **par navigateur et par appareil** (IndexedDB), y compris les photos et PDF (base `vantravel-docs`, embarqués dans la sauvegarde v3). Le pont entre appareils est la synchro (dépôt privé) ; le fichier de sauvegarde reste le plan B.
 
@@ -115,10 +115,10 @@ Critère : une réservation saisie sur un téléphone apparaît sur l'autre apr�
 
 ## Phase 6 : socle multi-voyage et Google (quand le besoin vient)
 
-- [ ] Sélecteur de voyage (plusieurs `trip.json`), création d'un voyage avec région, véhicule et point de départ ; nouvelle région = un fichier dans `src/data/regions/` et un catalogue dans `src/data/catalog/`.
-- [ ] Enrichissement Google Places (New) à la planification : clé restreinte par référent HTTP, résultats stockés dans le catalogue ou les hébergements, jamais appelés en voyage.
-- [ ] Découpage de `trip-map.tsx` (853 lignes) en modules par calque ; tests des reducers du store.
-- [ ] Mode sombre (tokens déjà présents dans `index.css`).
+- [~] Sélecteur de voyage : couvert côté dépôt privé par « Compte et synchro » (liste de `trips/index.json`, bouton « Utiliser ») et côté local par la bibliothèque. Reste : formulaire de création avec choix de région et de véhicule (une seule région aujourd'hui, `nz-south` ; nouvelle région = un fichier dans `src/data/regions/` et un catalogue dans `src/data/catalog/`, plus `buildCatalog` à paramétrer par région).
+- [ ] Enrichissement Google Places (New) à la planification : clé restreinte par référent HTTP, résultats stockés dans le catalogue ou les hébergements, jamais appelés en voyage. **Bloqué** tant qu'il n'y a pas de projet Google Cloud et de clé (à créer par la personne).
+- [ ] Découpage de `trip-map.tsx` (853 lignes) en modules par calque ; tests des reducers du store. Non fait : gros refactor à valider carte en main, à mener dans une session dédiée.
+- [x] Mode sombre (30 sept. 2026) : préférence Auto / Clair / Sombre (`src/lib/theme.ts` testé, `use-theme.ts`, `theme-toggle.tsx`), dans le dialogue profil et l'en-tête Planifier ; classe `dark` sur `<html>`, `theme-color` suit, impression toujours en clair, popups MapLibre aux couleurs de l'app.
 
 ## Idées écartées ou différées, avec la raison
 
