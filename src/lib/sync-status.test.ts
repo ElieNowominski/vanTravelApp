@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRelativeSync, syncBadge } from "@/lib/sync-status";
+import { describeItinerarySync, formatRelativeSync, syncBadge } from "@/lib/sync-status";
 
 describe("syncBadge", () => {
   it("hiérarchise : non configurée, en cours, hors ligne, erreur, en attente, ok", () => {
@@ -9,6 +9,19 @@ describe("syncBadge", () => {
     expect(syncBadge({ configured: true, status: "error", pending: false, online: true }).kind).toBe("error");
     expect(syncBadge({ configured: true, status: "idle", pending: true, online: true }).kind).toBe("pending");
     expect(syncBadge({ configured: true, status: "idle", pending: false, online: true }).kind).toBe("ok");
+  });
+});
+
+describe("describeItinerarySync", () => {
+  const T = "2027-02-07T08:00:00.000Z";
+  it("annonce envoi, réception, conflit ou rien à faire", () => {
+    expect(describeItinerarySync({ hasLocal: true, localChangedAt: null, hasRemote: false, remoteChanged: false })).toMatch(/sera envoyé/);
+    expect(describeItinerarySync({ hasLocal: false, localChangedAt: null, hasRemote: false, remoteChanged: false })).toMatch(/plan du voyage/);
+    expect(describeItinerarySync({ hasLocal: false, localChangedAt: null, hasRemote: true, remoteChanged: true })).toMatch(/sera reçu/);
+    expect(describeItinerarySync({ hasLocal: true, localChangedAt: T, hasRemote: true, remoteChanged: true })).toMatch(/Recevoir » ou « Envoyer/);
+    expect(describeItinerarySync({ hasLocal: true, localChangedAt: T, hasRemote: true, remoteChanged: false })).toMatch(/sera envoyé au dépôt/);
+    expect(describeItinerarySync({ hasLocal: true, localChangedAt: null, hasRemote: true, remoteChanged: true })).toMatch(/remplacera celui de cet appareil/);
+    expect(describeItinerarySync({ hasLocal: true, localChangedAt: null, hasRemote: true, remoteChanged: false })).toMatch(/identique/);
   });
 });
 

@@ -30,6 +30,7 @@ export class GitHubError extends Error {
 }
 
 export type RemoteFile = { sha: string; size: number; bytes: Uint8Array };
+export type RemoteFileMeta = { sha: string; size: number };
 
 const API = "https://api.github.com";
 const TIMEOUT_MS = 20_000;
@@ -94,6 +95,16 @@ export function encodeBase64(bytes: Uint8Array): string {
     bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return btoa(bin);
+}
+
+/** Métadonnées seules (sha, taille), pour annoncer ce qu'une synchro ferait sans télécharger un gros fichier. */
+export async function getFileMeta(ref: RepoRef, path: string): Promise<RemoteFileMeta | null> {
+  const res = await request(contentsUrl(ref, path), { headers: headers(ref), path });
+  if (res.status === 404) return null;
+  if (!res.ok) return fail(res, path);
+  const meta = (await res.json()) as { sha: string; size: number; type?: string };
+  if (meta.type && meta.type !== "file") throw new GitHubError("Le chemin n'est pas un fichier", 400, path);
+  return { sha: meta.sha, size: meta.size };
 }
 
 /** `null` quand le fichier n'existe pas (première synchro). */

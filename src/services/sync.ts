@@ -17,15 +17,18 @@ import {
   itinerarySignature,
   mergeExpenses,
   mergeTravel,
+  resolveItineraryDecision,
   stripTravel,
   tripPaths,
   type ExpensesDoc,
   type ItineraryDoc,
+  type ItineraryForce,
   type TravelDoc,
 } from "@/lib/sync-model";
+import { describeItinerarySync } from "@/lib/sync-status";
 import { validateTripConfig } from "@/lib/trip-config";
 import type { Booking, TripConfig } from "@/lib/types";
-import { GitHubError, getFile, getJson, putFile, putJson, type RepoRef } from "@/services/github-repo";
+import { GitHubError, getFile, getFileMeta, getJson, putFile, putJson, type RepoRef } from "@/services/github-repo";
 import { currentAuthor } from "@/store/profile-store";
 import { ensureSyncHydrated, isSyncConfigured, useSyncStore, type SyncSettings } from "@/store/sync-store";
 import { currentSnapshot, useTripStore } from "@/store/trip-store";
@@ -39,6 +42,8 @@ import { currentSnapshot, useTripStore } from "@/store/trip-store";
  * et la passe repart sur `online`, au retour au premier plan et toutes les dix minutes.
  */
 export type SyncOutcome = { ok: true; report: string } | { ok: false; reason: "not-configured" | "offline" | "busy" | "error"; message?: string };
+/** `itinerary` : choix explicite de la personne (« Recevoir », « Envoyer ») ; la règle automatique sinon. */
+export type SyncOptions = { itinerary?: ItineraryForce };
 
 const MAX_ATTEMPTS = 3;
 let running: Promise<SyncOutcome> | null = null;
@@ -60,15 +65,15 @@ export async function listRemoteTrips(settings: SyncSettings): Promise<RemoteTri
   });
 }
 
-export function syncNow(reason: string): Promise<SyncOutcome> {
+export function syncNow(reason: string, options: SyncOptions = {}): Promise<SyncOutcome> {
   if (running) return running;
-  running = run(reason).finally(() => {
+  running = run(reason, options).finally(() => {
     running = null;
   });
   return running;
 }
 
-async function run(reason: string): Promise<SyncOutcome> {
+async function run(reason: string, options: SyncOptions): Promise<SyncOutcome> {
   await ensureSyncHydrated();
   const sync = useSyncStore.getState();
   if (!isSyncConfigured(sync.settings)) return { ok: false, reason: "not-configured" };
@@ -80,7 +85,7 @@ async function run(reason: string): Promise<SyncOutcome> {
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      const report = await pass(reason);
+      const report = await pass(reason, options);
       return { ok: true, report };
     } catch (error) {
       lastError = error;
@@ -94,7 +99,7 @@ async function run(reason: string): Promise<SyncOutcome> {
   return { ok: false, reason: offline ? "offline" : "error", message };
 }
 
-async function pass(reason: string): Promise<string> {
+async function pass(reason: string, options: SyncOptions): Promise<string> {
   const sync = useSyncStore.getState();
   const settings = sync.settings;
   const ref = repoRef(settings);
@@ -137,13 +142,15 @@ async function pass(reason: string): Promise<string> {
   const hasLocal = hasItinerary(snapshot);
   const remoteItinDoc = remoteItin && isItineraryDoc(remoteItin.data) ? (remoteItin.data as ItineraryDoc) : null;
   const remoteSnapshot = remoteItinDoc ? migrateSnapshot(remoteItinDoc.snapshot) : null;
-  const decision = decideItinerary({
+  const hasRemote = !!remoteSnapshot && hasItinerary(remoteSnapshot);
+  const auto = decideItinerary({
     localChangedAt: tripReset ? null : sync.itineraryChangedAt,
     remoteChanged: !!remoteItin && remoteItin.sha !== sync.shas[paths.itinerary],
     remoteUpdatedAt: remoteItinDoc?.updatedAt ?? null,
-    hasRemote: !!remoteSnapshot && hasItinerary(remoteSnapshot),
+    hasRemote,
     hasLocal,
   });
+  const decision = resolveItineraryDecision(auto, options.itinerary ?? "auto", { hasLocal, hasRemote });
   if (decision === "take-remote" && remoteItinDoc && remoteSnapshot) {
     snapshot = applyItinerary(snapshot, remoteSnapshot);
     marks = Array.isArray(remoteItinDoc.marks) ? remoteItinDoc.marks : marks;
@@ -213,6 +220,21 @@ async function pass(reason: string): Promise<string> {
   useSyncStore.getState().finish(`${report} (${reason})`, shas);
   if (seedPlan) void useTripStore.getState().loadCatalogPlan();
   return report;
+}
+
+/** Annonce, sans rien écrire, ce que la prochaine synchro ferait de l'itinéraire (sha seul côté dépôt). */
+export async function previewItinerarySync(): Promise<string> {
+  await ensureSyncHydrated();
+  const sync = useSyncStore.getState();
+  if (!isSyncConfigured(sync.settings)) return "";
+  const path = tripPaths(sync.settings.tripId as string).itinerary;
+  const meta = await getFileMeta(repoRef(sync.settings), path);
+  return describeItinerarySync({
+    hasLocal: hasItinerary(currentSnapshot(useTripStore.getState())),
+    localChangedAt: sync.itineraryChangedAt,
+    hasRemote: !!meta,
+    remoteChanged: !!meta && meta.sha !== sync.shas[path],
+  });
 }
 
 /** Les écritures venues de la synchro ne doivent pas relever `pending`. */
@@ -333,7 +355,9 @@ export function startSyncScheduler(): () => void {
   };
 
   const unsubscribe = useTripStore.subscribe((next, prev) => {
-    if (applying) return;
+    // La réhydratation du brouillon (IndexedDB) passe aussi par ici : ce n'est pas une modification. Sans ce
+    // garde, chaque ouverture de l'app datait l'itinéraire local de « maintenant » et il gagnait toujours.
+    if (applying || !useTripStore.persist.hasHydrated()) return;
     const structural =
       next.days !== prev.days || next.stops !== prev.stops || next.legs !== prev.legs || next.customPins !== prev.customPins || next.frozenAt !== prev.frozenAt;
     const travel = structural || next.marks !== prev.marks || next.tombstones !== prev.tombstones;

@@ -14,6 +14,25 @@ export function syncBadge(input: { configured: boolean; status: SyncStatus; pend
   return { kind: "ok", label: "Synchronisée" };
 }
 
+/**
+ * Ce que la prochaine synchro fera de l'itinéraire, annoncé avant d'agir. `hasRemote` : le dépôt a un
+ * `itinerary.json` ; `remoteChanged` : son sha n'est plus celui de la dernière synchro.
+ */
+export function describeItinerarySync(input: { hasLocal: boolean; localChangedAt: string | null; hasRemote: boolean; remoteChanged: boolean }): string {
+  if (!input.hasRemote) {
+    return input.hasLocal
+      ? "Le dépôt n’a pas encore d’itinéraire : celui de cet appareil sera envoyé."
+      : "Ni le dépôt ni cet appareil n’ont d’itinéraire : le plan du voyage sera posé.";
+  }
+  if (!input.hasLocal) return "Cet appareil n’a pas d’itinéraire : celui du dépôt sera reçu.";
+  if (input.localChangedAt && input.remoteChanged) {
+    return "Le dépôt et cet appareil ont changé depuis la dernière synchro : la synchro automatique garde le plus récent. « Recevoir » ou « Envoyer » tranche à la main.";
+  }
+  if (input.localChangedAt) return "L’itinéraire de cet appareil a changé : il sera envoyé au dépôt.";
+  if (input.remoteChanged) return "L’itinéraire du dépôt a changé : il sera reçu et remplacera celui de cet appareil (réservations, notes et dépenses conservées).";
+  return "Itinéraire identique des deux côtés.";
+}
+
 /** « il y a 3 min », « il y a 2 h », « hier », ou la date ; `jamais` sans synchro. */
 export function formatRelativeSync(iso: string | null, now = new Date()): string {
   if (!iso) return "jamais";

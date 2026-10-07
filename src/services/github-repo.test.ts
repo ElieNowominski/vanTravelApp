@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GitHubError, checkAccess, decodeBase64, encodeBase64, getJson, putJson } from "@/services/github-repo";
+import { GitHubError, checkAccess, decodeBase64, encodeBase64, getFileMeta, getJson, putJson } from "@/services/github-repo";
 
 const ref = { owner: "moi", repo: "vanTravel", token: "t" };
 
@@ -31,6 +31,17 @@ describe("getJson", () => {
     const [url, init] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
     expect(url).toBe("https://api.github.com/repos/moi/vanTravel/contents/trips/x/travel.json");
     expect((init.headers as Record<string, string>).Authorization).toBe("Bearer t");
+  });
+
+  it("getFileMeta lit sha et taille sans contenu, null sur 404", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("absent.json")) return jsonResponse(404, { message: "Not Found" });
+      return jsonResponse(200, { sha: "big", size: 5_000_000, type: "file", encoding: "none", content: "" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getFileMeta(ref, "trips/x/absent.json")).toBeNull();
+    expect(await getFileMeta(ref, "trips/x/itinerary.json")).toEqual({ sha: "big", size: 5_000_000 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("repasse en brut quand l'API ne renvoie pas le contenu (fichier > 1 Mo)", async () => {

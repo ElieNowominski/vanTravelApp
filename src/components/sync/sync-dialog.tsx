@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Cloud, CloudOff, KeyRound, RefreshCw, TriangleAlert } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Cloud, CloudOff, Download, KeyRound, RefreshCw, TriangleAlert, Upload } from "lucide-react";
 import { ConfirmAction } from "@/components/confirm-action";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -7,10 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useOnline } from "@/hooks/use-online";
+import type { ItineraryForce } from "@/lib/sync-model";
 import { formatRelativeSync } from "@/lib/sync-status";
 import { cn } from "@/lib/utils";
 import { checkAccess, type RepoAccess } from "@/services/github-repo";
-import { listRemoteTrips, repoRef, syncNow, type RemoteTripEntry } from "@/services/sync";
+import { listRemoteTrips, previewItinerarySync, repoRef, syncNow, type RemoteTripEntry } from "@/services/sync";
 import { isSyncConfigured, useSyncStore } from "@/store/sync-store";
 
 /**
@@ -44,6 +45,20 @@ function SyncDialogBody({ onClose }: { onClose: () => void }) {
   const [trips, setTrips] = useState<RemoteTripEntry[] | null>(null);
   const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const configured = isSyncConfigured(settings);
+
+  // Avant d'agir : ce que la passe ferait de l'itinéraire (un seul appel, sha du fichier distant).
+  useEffect(() => {
+    if (!configured || !online || status === "syncing") return;
+    let alive = true;
+    previewItinerarySync()
+      .then((text) => alive && setPreview(text || null))
+      .catch(() => alive && setPreview(null));
+    return () => {
+      alive = false;
+    };
+  }, [configured, online, status, lastSyncAt]);
 
   const draft = { ...settings, owner: owner.trim(), repo: repo.trim(), branch: branch.trim(), token: token.trim(), passphrase };
   const dirty = draft.owner !== settings.owner || draft.repo !== settings.repo || draft.branch !== settings.branch || draft.token !== settings.token || passphrase !== settings.passphrase;
@@ -84,17 +99,15 @@ function SyncDialogBody({ onClose }: { onClose: () => void }) {
     });
   };
 
-  const syncOnce = () => {
+  const syncWith = (reason: string, itinerary?: ItineraryForce) => {
     setMessage(null);
-    void syncNow("manuel").then((outcome) => {
+    void syncNow(reason, { itinerary }).then((outcome) => {
       if (outcome.ok) setMessage(`Synchronisé : ${outcome.report}.`);
       else if (outcome.reason === "offline") setMessage("Hors ligne : la synchro partira au retour du réseau.");
       else if (outcome.reason === "not-configured") setMessage("Choisis d’abord un voyage.");
       else setMessage(outcome.message ?? "Synchronisation impossible.");
     });
   };
-
-  const configured = isSyncConfigured(settings);
 
   return (
     <Dialog open onOpenChange={(next) => !next && onClose()}>
@@ -109,16 +122,43 @@ function SyncDialogBody({ onClose }: { onClose: () => void }) {
         <section className="flex flex-col gap-3">
           <StatusLine status={status} online={online} pending={pending} configured={configured} lastSyncAt={lastSyncAt} lastError={lastError} lastReport={lastReport} />
           {configured && (
-            <div className="flex flex-wrap gap-2">
-              <Button className="h-11" disabled={status === "syncing"} onClick={syncOnce}>
-                <RefreshCw className={cn("size-4", status === "syncing" && "animate-spin")} />
-                Synchroniser maintenant
-              </Button>
-              <label className="flex h-11 items-center gap-2 text-sm">
-                <Switch checked={settings.autoSync} onCheckedChange={(v) => setSettings({ autoSync: v })} />
-                Automatique
-              </label>
-            </div>
+            <>
+              {preview && <p className="text-xs text-muted-foreground">{preview}</p>}
+              <div className="flex flex-wrap gap-2">
+                <Button className="h-11" disabled={status === "syncing"} onClick={() => syncWith("manuel")}>
+                  <RefreshCw className={cn("size-4", status === "syncing" && "animate-spin")} />
+                  Synchroniser
+                </Button>
+                <label className="flex h-11 items-center gap-2 text-sm">
+                  <Switch checked={settings.autoSync} onCheckedChange={(v) => setSettings({ autoSync: v })} />
+                  Automatique
+                </label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <ConfirmAction
+                  variant="outline"
+                  size="sm"
+                  className="h-11"
+                  disabled={status === "syncing"}
+                  icon={<Download className="size-4" />}
+                  label="Recevoir l’itinéraire du dépôt"
+                  question="Remplacer l’itinéraire de cet appareil par celui du dépôt ? Réservations, notes et dépenses sont conservées."
+                  confirmLabel="Recevoir"
+                  onConfirm={() => syncWith("réception demandée", "take-remote")}
+                />
+                <ConfirmAction
+                  variant="outline"
+                  size="sm"
+                  className="h-11"
+                  disabled={status === "syncing"}
+                  icon={<Upload className="size-4" />}
+                  label="Envoyer mon itinéraire"
+                  question="Remplacer l’itinéraire du dépôt par celui de cet appareil ? L’autre téléphone le recevra à sa prochaine synchro."
+                  confirmLabel="Envoyer"
+                  onConfirm={() => syncWith("envoi demandé", "push-local")}
+                />
+              </div>
+            </>
           )}
         </section>
 

@@ -4,6 +4,7 @@ import {
   applyTravel,
   decideItinerary,
   hasItinerary,
+  resolveItineraryDecision,
   documentPath,
   emptyExpensesDoc,
   emptyTravelDoc,
@@ -166,6 +167,14 @@ describe("itinéraire", () => {
     expect(decideItinerary({ localChangedAt: T0, remoteChanged: true, remoteUpdatedAt: T1, hasRemote: true, hasLocal: true })).toBe("take-remote");
     expect(decideItinerary({ localChangedAt: T2, remoteChanged: true, remoteUpdatedAt: T1, hasRemote: true, hasLocal: true })).toBe("push-local");
     expect(decideItinerary({ localChangedAt: null, remoteChanged: false, remoteUpdatedAt: T1, hasRemote: true, hasLocal: true })).toBe("none");
+  });
+
+  it("resolveItineraryDecision : le choix explicite s'applique seulement s'il a un sens", () => {
+    expect(resolveItineraryDecision("push-local", "take-remote", { hasLocal: true, hasRemote: true })).toBe("take-remote");
+    expect(resolveItineraryDecision("push-local", "take-remote", { hasLocal: true, hasRemote: false })).toBe("push-local");
+    expect(resolveItineraryDecision("take-remote", "push-local", { hasLocal: true, hasRemote: true })).toBe("push-local");
+    expect(resolveItineraryDecision("take-remote", "push-local", { hasLocal: false, hasRemote: true })).toBe("take-remote");
+    expect(resolveItineraryDecision("none", "auto", { hasLocal: true, hasRemote: true })).toBe("none");
   });
 
   it("hasItinerary : le départ automatique seul ne compte pas", () => {

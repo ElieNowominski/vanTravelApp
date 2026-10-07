@@ -315,6 +315,15 @@ export function hasItinerary(snapshot: Pick<TripSnapshot, "days" | "stops" | "le
 }
 
 export type ItineraryDecision = "keep-local" | "take-remote" | "push-local" | "none";
+/** Choix explicite de la personne dans le dialogue : « Recevoir », « Envoyer », ou la règle automatique. */
+export type ItineraryForce = "auto" | "take-remote" | "push-local";
+
+/** Applique le choix explicite seulement s'il a un sens (on ne reçoit pas un itinéraire absent). */
+export function resolveItineraryDecision(auto: ItineraryDecision, force: ItineraryForce, input: { hasLocal: boolean; hasRemote: boolean }): ItineraryDecision {
+  if (force === "take-remote" && input.hasRemote) return "take-remote";
+  if (force === "push-local" && input.hasLocal) return "push-local";
+  return auto;
+}
 
 /**
  * Qui a raison sur l'itinéraire ? `localChangedAt` : dernière modification structurelle locale
