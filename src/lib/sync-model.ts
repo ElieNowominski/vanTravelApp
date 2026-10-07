@@ -1,3 +1,4 @@
+import { START_STOP_ID } from "@/lib/constants";
 import { normalizeTombstones } from "@/lib/migrations";
 import type {
   Booking,
@@ -301,6 +302,16 @@ export function applyItinerary(local: TripSnapshot, remote: TripSnapshot): TripS
     frozenAt: remote.frozenAt ?? null,
     tombstones: normalizeTombstones(local.tombstones),
   };
+}
+
+/**
+ * Un snapshot réduit à l'étape de départ posée automatiquement (`seedStart`) ne porte aucune information :
+ * ni en local ni dans le dépôt il ne doit l'emporter sur un vrai itinéraire.
+ */
+export function hasItinerary(snapshot: Pick<TripSnapshot, "days" | "stops" | "legs" | "customPins">): boolean {
+  if (snapshot.legs.length > 0 || snapshot.customPins.length > 0) return true;
+  if (Object.keys(snapshot.stops).some((id) => id !== START_STOP_ID)) return true;
+  return snapshot.days.some((day) => day.stopIds.some((id) => id !== START_STOP_ID));
 }
 
 export type ItineraryDecision = "keep-local" | "take-remote" | "push-local" | "none";

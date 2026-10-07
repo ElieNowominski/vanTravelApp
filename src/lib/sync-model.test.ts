@@ -3,6 +3,7 @@ import {
   applyItinerary,
   applyTravel,
   decideItinerary,
+  hasItinerary,
   documentPath,
   emptyExpensesDoc,
   emptyTravelDoc,
@@ -165,6 +166,16 @@ describe("itinéraire", () => {
     expect(decideItinerary({ localChangedAt: T0, remoteChanged: true, remoteUpdatedAt: T1, hasRemote: true, hasLocal: true })).toBe("take-remote");
     expect(decideItinerary({ localChangedAt: T2, remoteChanged: true, remoteUpdatedAt: T1, hasRemote: true, hasLocal: true })).toBe("push-local");
     expect(decideItinerary({ localChangedAt: null, remoteChanged: false, remoteUpdatedAt: T1, hasRemote: true, hasLocal: true })).toBe("none");
+  });
+
+  it("hasItinerary : le départ automatique seul ne compte pas", () => {
+    const seedOnly = { days: [{ ...snapshot().days[0], stopIds: ["stop-start"] }], stops: { "stop-start": stop("stop-start") }, legs: [], customPins: [] };
+    expect(hasItinerary(seedOnly)).toBe(false);
+    expect(hasItinerary({ ...seedOnly, days: [], stops: {} })).toBe(false);
+    expect(hasItinerary({ ...seedOnly, stops: { ...seedOnly.stops, s1: stop("s1") } })).toBe(true);
+    expect(hasItinerary({ ...seedOnly, legs: snapshot().legs })).toBe(true);
+    expect(hasItinerary({ ...seedOnly, customPins: [{ placeId: "p", name: "Pin", lng: 0, lat: 0, kind: "poi" }] })).toBe(true);
+    expect(hasItinerary(snapshot())).toBe(true);
   });
 
   it("documentPath respecte le chemin existant et en déduit un sinon", () => {

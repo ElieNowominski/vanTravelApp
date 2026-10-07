@@ -54,7 +54,7 @@ Trois fichiers JSON par voyage dans le dépôt privé, à côté de `trip.json` 
 
 | Fichier | Contenu | Règle de fusion |
 | --- | --- | --- |
-| `trips/<id>/itinerary.json` | jours, étapes (sans données de voyage), tronçons, pins, figeage, plus et moins, `updatedAt`, `updatedBy` | fichier entier : la modification structurelle la plus récente gagne (`decideItinerary`), les données de voyage locales des étapes connues sont conservées |
+| `trips/<id>/itinerary.json` | jours, étapes (sans données de voyage), tronçons, pins, figeage, plus et moins, `updatedAt`, `updatedBy` | fichier entier : la modification structurelle la plus récente gagne (`decideItinerary`), les données de voyage locales des étapes connues sont conservées. Un snapshot réduit au départ automatique ne compte pas (`hasItinerary`), d'un côté comme de l'autre : un brouillon vide ne l'emporte jamais sur un dépôt qui a un itinéraire |
 | `trips/<id>/travel.json` | par étape : réservations, documents (métadonnées), checklist, notes ; par date : notes, météo ; pierres tombales | par entité : `updatedAt` le plus récent gagne ; une pierre tombale plus récente que l'entité l'efface |
 | `trips/<id>/expenses.json` | dépenses à plat (chacune porte sa date), pierres tombales | par entité, fichier à part car les deux personnes en saisissent en même temps |
 | `trips/<id>/docs/<docId>.<ext>` | contenu des photos et PDF | présent ou absent : envoyé si manquant à distance, téléchargé si manquant en local |
@@ -70,7 +70,8 @@ Chiffrement optionnel des codes d'accès (`src/lib/secure.ts`) : AES-GCM 256, cl
 1. Réhydratation du brouillon (IndexedDB, `useTripBoot`), puis choix du mode (Planifier ou Voyager).
 2. Sans voyage chargé, en dev : lecture de `/__private/trips/index.json` puis du premier `trip.json` (plugin Vite `privateDataPlugin`).
 3. Toujours sans voyage : écran de démarrage (`TripSetupScreen`) : importer une sauvegarde, rouvrir un circuit de la bibliothèque, créer un voyage neuf.
-4. Sans voyage mais synchro configurée (nouvel appareil) : `syncNow("démarrage")` lit `trip.json` puis l'itinéraire et les données de voyage du dépôt privé.
+4. Sans voyage mais synchro configurée (nouvel appareil) : `syncNow("démarrage")` lit `trip.json` puis l'itinéraire et les données de voyage du dépôt privé. Si ni le dépôt ni l'appareil n'ont d'itinéraire, le `plan` de `trip.json` est posé (routes recalculées) et envoyé à la passe suivante.
+5. Un circuit local sous un autre identifiant que `trip.json` (sauvegarde importée, bibliothèque) est conservé par la synchro s'il couvre les mêmes dates : `decideItinerary` tranche ensuite. Seul un calendrier différent remet le brouillon à zéro.
 
 ## Phases
 

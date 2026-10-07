@@ -103,6 +103,8 @@ Objectif : deux téléphones, un même voyage, sans base de données.
 - [x] Chiffrement optionnel des codes d'accès (`src/lib/secure.ts`, testé) : AES-GCM 256, PBKDF2 depuis la phrase saisie dans « Compte et synchro » ; `accessCodeSecure` dans le dépôt, « code chiffré » sur l'appareil sans phrase.
 - [x] Côté dépôt privé : structure documentée dans `trips/README.md` (modifié localement dans `../vanTravel`, à commiter là-bas). **À faire par la personne** : ajouter la compagne comme collaboratrice, un token par téléphone.
 
+- [x] Correctif (7 oct. 2026) : un circuit importé d'une sauvegarde portait un autre identifiant que `trip.json` ; « Utiliser » le voyage remettait le brouillon à zéro et envoyait ce brouillon vide (départ seul) comme `itinerary.json`, que tous les appareils reprenaient ensuite. Désormais : circuit local gardé si même calendrier, départ seul = pas d'itinéraire (`hasItinerary`, testé), et sans rien d'aucun côté le `plan` de `trip.json` est posé. `itinerary.json` du dépôt privé régénéré depuis la sauvegarde du 7 oct.
+
 Critère : une réservation saisie sur un téléphone apparaît sur l'autre après retour du réseau, sans écraser une modification faite entre-temps. **À valider sur les deux téléphones.**
 
 ### Mise en service (à faire par la personne)

@@ -10,6 +10,7 @@ import {
   emptyTravelDoc,
   extractExpenses,
   extractTravel,
+  hasItinerary,
   isExpensesDoc,
   isItineraryDoc,
   isTravelDoc,
@@ -105,12 +106,17 @@ async function pass(reason: string): Promise<string> {
   // 1. Le voyage lui-même (dates, véhicule, hébergements), écrit à la main dans le dépôt privé.
   const trip = useTripStore.getState();
   let config: TripConfig | null = trip.config;
+  let tripReset = false;
   if (!config || config.id !== tripId) {
     const remoteTrip = await getJson<unknown>(ref, paths.trip);
     if (!remoteTrip) throw new GitHubError(`Aucun ${paths.trip} dans le dépôt`, 404, paths.trip);
     config = validateTripConfig(remoteTrip.data);
     shas[paths.trip] = remoteTrip.sha;
-    withoutMarking(() => useTripStore.getState().setTripConfig(config as TripConfig, { reset: trip.config?.id !== tripId && trip.days.length > 0 }));
+    // Le circuit local (sauvegarde importée, circuit rouvert depuis la bibliothèque) porte souvent un autre
+    // identifiant que trip.json : `setTripConfig` le garde s'il couvre les mêmes dates et `decideItinerary`
+    // tranche ensuite entre lui et le dépôt. Un calendrier différent repart d'un brouillon vierge.
+    withoutMarking(() => useTripStore.getState().setTripConfig(config as TripConfig));
+    tripReset = useTripStore.getState().days !== trip.days;
     changes.push("voyage chargé");
   }
 
@@ -125,17 +131,21 @@ async function pass(reason: string): Promise<string> {
   const state = useTripStore.getState();
   let snapshot = currentSnapshot(state);
   let marks = state.marks;
-  const hasLocal = state.days.some((d) => d.stopIds.length > 0) || state.legs.length > 0;
+  // Le départ posé automatiquement ne compte pas comme itinéraire, d'un côté comme de l'autre : un brouillon
+  // vide ne l'emporte jamais sur un dépôt qui a un itinéraire, même avec une modification en attente (un
+  // brouillon vidé exprès est repris du dépôt à la passe suivante ; l'historique git garde tout).
+  const hasLocal = hasItinerary(snapshot);
   const remoteItinDoc = remoteItin && isItineraryDoc(remoteItin.data) ? (remoteItin.data as ItineraryDoc) : null;
+  const remoteSnapshot = remoteItinDoc ? migrateSnapshot(remoteItinDoc.snapshot) : null;
   const decision = decideItinerary({
-    localChangedAt: sync.itineraryChangedAt,
+    localChangedAt: tripReset ? null : sync.itineraryChangedAt,
     remoteChanged: !!remoteItin && remoteItin.sha !== sync.shas[paths.itinerary],
     remoteUpdatedAt: remoteItinDoc?.updatedAt ?? null,
-    hasRemote: !!remoteItinDoc,
+    hasRemote: !!remoteSnapshot && hasItinerary(remoteSnapshot),
     hasLocal,
   });
-  if (decision === "take-remote" && remoteItinDoc) {
-    snapshot = applyItinerary(snapshot, migrateSnapshot(remoteItinDoc.snapshot));
+  if (decision === "take-remote" && remoteItinDoc && remoteSnapshot) {
+    snapshot = applyItinerary(snapshot, remoteSnapshot);
     marks = Array.isArray(remoteItinDoc.marks) ? remoteItinDoc.marks : marks;
     changes.push(`itinéraire reçu (${remoteItinDoc.updatedBy || "autre appareil"})`);
   }
@@ -194,8 +204,14 @@ async function pass(reason: string): Promise<string> {
   if (docs.downloaded) changes.push(`${docs.downloaded} document${docs.downloaded > 1 ? "s" : ""} reçu${docs.downloaded > 1 ? "s" : ""}`);
   if (docs.failed) changes.push(`${docs.failed} document${docs.failed > 1 ? "s" : ""} en attente`);
 
+  // 8. Rien d'aucun côté : le plan écrit dans trip.json sert de point de départ, comme en dev. Les routes
+  // se calculent en arrière-plan ; le planificateur enverra l'itinéraire obtenu à la passe suivante.
+  const seedPlan = decision === "none" && !hasLocal && config.plan.days.length > 0;
+  if (seedPlan) changes.push("plan du voyage chargé");
+
   const report = changes.length > 0 ? changes.join(", ") : "à jour";
   useSyncStore.getState().finish(`${report} (${reason})`, shas);
+  if (seedPlan) void useTripStore.getState().loadCatalogPlan();
   return report;
 }
 
