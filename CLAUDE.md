@@ -1,6 +1,6 @@
 # vanTravelApp
 
-Application personnelle de roadtrip en van (deux utilisateurs, mobile et web), SPA Vite + React déployée sur GitHub Pages. Ce dépôt est **public**. Architecture et décisions : `docs/ARCHITECTURE.md`. Plan de travail et état d'avancement : `docs/PLAN.md` (à mettre à jour en fin de session). Règles détaillées : `.cursor/rules/`.
+Application personnelle de roadtrip en van (deux utilisateurs, mobile et web), SPA Vite + React déployée sur GitHub Pages. Ce dépôt est **public**. Architecture et décisions : `docs/ARCHITECTURE.md`. Plan de travail et état d'avancement : `docs/PLAN.md` (à mettre à jour en fin de session). Journal de bord pour le retour d'expérience : `docs/JOURNAL.md` (une entrée par session, règle 11). Règles détaillées : `.cursor/rules/`.
 
 Dépôt jumeau **privé** : `../vanTravel` (`C:/Users/enowo/Documents/Projects/vanTravel`), dossier `trips/` = données de voyage, servi en dev sous `/__private/`. Site publié : https://elienowominski.github.io/vanTravelApp/
 
@@ -16,6 +16,7 @@ Dépôt jumeau **privé** : `../vanTravel` (`C:/Users/enowo/Documents/Projects/v
 8. **Sources externes** : respecter les politiques d'usage (attribution OSM et OSRM, pas de préchargement de tuiles OSM, une requête par seconde vers OSRM).
 9. **Port de dev 43217** : le libérer après tout test (voir `.cursor/rules/liberer-port-dev.mdc`).
 10. **Git : commits directement sur `main`**, hotfix compris. Une seule personne travaille ici et chaque push déploie sur Pages. Pas de branche ni de PR sauf demande explicite. Avant chaque commit : lint, typecheck, tests, et le contrôle « aucune donnée perso » de `.cursor/rules/donnees-perso-et-securite.mdc`.
+11. **Journal en fin de session** : ajouter une entrée dans `docs/JOURNAL.md` selon son gabarit (intention, demandes en substance, livré, cassé ou appris dont les erreurs de l'assistant, décisions avec leur raison, chiffres). Elle sert au retour d'expérience sur la construction de l'app : écrire ce que git ne dit pas, sans donnée personnelle.
 
 ## Synchro (phase 5)
 
