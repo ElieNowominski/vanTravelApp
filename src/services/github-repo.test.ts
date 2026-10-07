@@ -74,6 +74,9 @@ describe("putJson", () => {
     expect(body.branch).toBe("main");
     expect(body.message).toBe("Synchro");
     expect(new TextDecoder().decode(decodeBase64(body.content))).toBe('{\n  "a": 1\n}\n');
+    await putJson(ref, "trips/x/itinerary.json", { a: [1, 2] }, "Synchro", null, { compact: true });
+    const compact = JSON.parse((fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1].body as string) as Record<string, string>;
+    expect(new TextDecoder().decode(decodeBase64(compact.content))).toBe('{"a":[1,2]}\n');
   });
 
   it("signale le conflit de sha (409) et le sha manquant (422)", async () => {

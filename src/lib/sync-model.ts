@@ -5,6 +5,7 @@ import type {
   ChecklistItem,
   EntityMeta,
   Expense,
+  Leg,
   Stop,
   TripDay,
   TripDocument,
@@ -228,6 +229,23 @@ export function applyTravel(snapshot: TripSnapshot, travel: TravelDoc, expenses:
 }
 
 /** Itinéraire sans les données de voyage : c'est ce que `itinerary.json` transporte. */
+/** Cinq décimales, soit un mètre : assez pour une route, et dix pour cent de fichier en moins. */
+const COORD_DECIMALS = 5;
+
+export function roundLegCoordinates(leg: Leg, decimals = COORD_DECIMALS): Leg {
+  const factor = 10 ** decimals;
+  return {
+    ...leg,
+    options: leg.options.map((option) => ({
+      ...option,
+      geometry: {
+        ...option.geometry,
+        coordinates: option.geometry.coordinates.map((position) => position.map((value) => Math.round(value * factor) / factor)),
+      },
+    })),
+  };
+}
+
 export function stripTravel(snapshot: TripSnapshot): TripSnapshot {
   const stops: Record<string, Stop> = {};
   for (const [id, stop] of Object.entries(snapshot.stops)) {
@@ -245,7 +263,7 @@ export function stripTravel(snapshot: TripSnapshot): TripSnapshot {
       expenses: [],
     })),
     stops,
-    legs: snapshot.legs,
+    legs: snapshot.legs.map((leg) => roundLegCoordinates(leg)),
     customPins: snapshot.customPins,
     currentDayIndex: snapshot.currentDayIndex,
     frozenAt: snapshot.frozenAt ?? null,

@@ -54,7 +54,7 @@ Trois fichiers JSON par voyage dans le dépôt privé, à côté de `trip.json` 
 
 | Fichier | Contenu | Règle de fusion |
 | --- | --- | --- |
-| `trips/<id>/itinerary.json` | jours, étapes (sans données de voyage), tronçons, pins, figeage, plus et moins, `updatedAt`, `updatedBy` | fichier entier : la modification structurelle la plus récente gagne (`decideItinerary`), les données de voyage locales des étapes connues sont conservées. Un snapshot réduit au départ automatique ne compte pas (`hasItinerary`), d'un côté comme de l'autre : un brouillon vide ne l'emporte jamais sur un dépôt qui a un itinéraire |
+| `trips/<id>/itinerary.json` | jours, étapes (sans données de voyage), tronçons, pins, figeage, plus et moins, `updatedAt`, `updatedBy` | fichier entier : la modification structurelle la plus récente gagne (`decideItinerary`), les données de voyage locales des étapes connues sont conservées. Un snapshot réduit au départ automatique ne compte pas (`hasItinerary`), d'un côté comme de l'autre : un brouillon vide ne l'emporte jamais sur un dépôt qui a un itinéraire. Écrit en JSON compact, tracés arrondis à cinq décimales (`roundLegCoordinates`) : 1,3 Mo au lieu de 5,6 |
 | `trips/<id>/travel.json` | par étape : réservations, documents (métadonnées), checklist, notes ; par date : notes, météo ; pierres tombales | par entité : `updatedAt` le plus récent gagne ; une pierre tombale plus récente que l'entité l'efface |
 | `trips/<id>/expenses.json` | dépenses à plat (chacune porte sa date), pierres tombales | par entité, fichier à part car les deux personnes en saisissent en même temps |
 | `trips/<id>/docs/<docId>.<ext>` | contenu des photos et PDF | présent ou absent : envoyé si manquant à distance, téléchargé si manquant en local |

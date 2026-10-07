@@ -105,6 +105,7 @@ Objectif : deux téléphones, un même voyage, sans base de données.
 
 - [x] Correctif (7 oct. 2026) : un circuit importé d'une sauvegarde portait un autre identifiant que `trip.json` ; « Utiliser » le voyage remettait le brouillon à zéro et envoyait ce brouillon vide (départ seul) comme `itinerary.json`, que tous les appareils reprenaient ensuite. Désormais : circuit local gardé si même calendrier, départ seul = pas d'itinéraire (`hasItinerary`, testé), et sans rien d'aucun côté le `plan` de `trip.json` est posé. `itinerary.json` du dépôt privé régénéré depuis la sauvegarde du 7 oct.
 - [x] Correctif (7 oct. 2026, suite) : le planificateur s'abonnait au store avant la réhydratation, donc chaque ouverture de l'app comptait comme une modification de l'itinéraire et l'appareil gagnait toujours sur le dépôt (ping-pong entre téléphone et PC). Garde `persist.hasHydrated()`. Dialogue : annonce de ce que la passe fera de l'itinéraire, boutons « Recevoir l'itinéraire du dépôt » et « Envoyer mon itinéraire » (`resolveItineraryDecision`, `describeItinerarySync`, `getFileMeta`, testés).
+- [x] Allègement (7 oct. 2026) : `itinerary.json` écrit en JSON compact et tracés arrondis à cinq décimales (`roundLegCoordinates`, testé) : 1,3 Mo au lieu de 5,6 pour 19 tronçons et 61 000 points. Le fichier n'avait aucune alternative : l'indentation seule multipliait sa taille par quatre.
 
 Critère : une réservation saisie sur un téléphone apparaît sur l'autre après retour du réseau, sans écraser une modification faite entre-temps. **À valider sur les deux téléphones.**
 

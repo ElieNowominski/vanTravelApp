@@ -5,6 +5,7 @@ import {
   decideItinerary,
   hasItinerary,
   resolveItineraryDecision,
+  roundLegCoordinates,
   documentPath,
   emptyExpensesDoc,
   emptyTravelDoc,
@@ -132,6 +133,23 @@ describe("mergeTravel et mergeExpenses", () => {
 });
 
 describe("itinéraire", () => {
+  it("roundLegCoordinates arrondit les tracés à cinq décimales sans toucher au reste", () => {
+    const leg = {
+      id: "l1",
+      fromStopId: "s1",
+      toStopId: "s2",
+      dayIndex: 0,
+      selectedIndex: 0,
+      estimated: false,
+      options: [{ geometry: { type: "LineString" as const, coordinates: [[172.636214789, -43.532104321], [170.4647, -44.0008]] }, distanceKm: 1.234567, durationCarSec: 10, durationVanSec: 13, winding: false, label: "A" }],
+    };
+    const out = roundLegCoordinates(leg);
+    expect(out.options[0].geometry.coordinates).toEqual([[172.63621, -43.5321], [170.4647, -44.0008]]);
+    expect(out.options[0].distanceKm).toBe(1.234567);
+    expect(leg.options[0].geometry.coordinates[0][0]).toBe(172.636214789);
+    expect(stripTravel({ ...snapshot(), legs: [leg] }).legs[0].options[0].geometry.coordinates[0]).toEqual([172.63621, -43.5321]);
+  });
+
   it("stripTravel retire les données de voyage et la signature ignore les réservations", () => {
     const snap = snapshot();
     const stripped = stripTravel(snap);

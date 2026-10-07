@@ -185,7 +185,7 @@ async function pass(reason: string, options: SyncOptions): Promise<string> {
   const author = currentAuthor();
   if (decision === "push-local") {
     const doc: ItineraryDoc = { format: 1, updatedAt: now, updatedBy: author, snapshot: stripTravel(snapshot), marks };
-    const put = await putJson(ref, paths.itinerary, doc, `Itinéraire (${author})`, remoteItin?.sha ?? null);
+    const put = await putJson(ref, paths.itinerary, doc, `Itinéraire (${author})`, remoteItin?.sha ?? null, { compact: true });
     shas[paths.itinerary] = put.sha;
     changes.push("itinéraire envoyé");
   }

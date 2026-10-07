@@ -158,8 +158,10 @@ export async function putFile(
   return { sha: out.content.sha };
 }
 
-export async function putJson(ref: RepoRef, path: string, data: unknown, message: string, sha?: string | null): Promise<{ sha: string }> {
-  return putFile(ref, path, new TextEncoder().encode(JSON.stringify(data, null, 2) + "\n"), message, sha);
+/** `compact` : sans indentation, pour les gros fichiers (l'itinéraire et ses tracés pèsent quatre fois moins). */
+export async function putJson(ref: RepoRef, path: string, data: unknown, message: string, sha?: string | null, options: { compact?: boolean } = {}): Promise<{ sha: string }> {
+  const text = options.compact ? JSON.stringify(data) : JSON.stringify(data, null, 2);
+  return putFile(ref, path, new TextEncoder().encode(text + "\n"), message, sha);
 }
 
 export type RepoAccess = { fullName: string; isPrivate: boolean; canPush: boolean; defaultBranch: string };
