@@ -10,6 +10,7 @@ import {
   reportNeedRefresh,
   reportOfflineReady,
 } from "./services/app-update";
+import { startAuthListener } from "./services/auth";
 import { startSyncScheduler } from "./services/sync";
 
 // Mode « prompt » : la nouvelle version s'installe en arrière-plan et attend un toucher sur
@@ -29,7 +30,9 @@ answerUpdateCapabilityProbes();
 // Stockage durable quand le navigateur le propose (Chromium) : IndexedDB survit à la pression disque.
 // Safari ne l'expose pas ; là, c'est l'installation sur l'écran d'accueil qui protège les données.
 void navigator.storage?.persist?.().catch(() => undefined);
-// Synchro entre appareils (dépôt privé) : à chaque modification, au retour du réseau, au premier plan.
+// Session Supabase (identité recopiée pour l’affichage hors ligne), puis synchro entre appareils :
+// à chaque modification, au retour du réseau, au premier plan.
+startAuthListener();
 startSyncScheduler();
 
 createRoot(document.getElementById("root")!).render(

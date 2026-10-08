@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import { WifiOff } from "lucide-react";
-import { isSyncConfigured, useSyncStore } from "@/store/sync-store";
+import { isSyncConfigured, useAccountStore } from "@/store/account-store";
 
 type Phase = "online" | "offline" | "back-online";
 
 /**
  * Bandeau d'état réseau. Hors ligne : rappel que tout ce qui est stocké reste disponible.
- * Retour en ligne : confirmation brève. La synchro en attente (phase 5) s'affichera ici aussi.
+ * Retour en ligne : confirmation brève. La synchro en attente s’affiche ici aussi.
  */
 export function NetworkBanner() {
   const [phase, setPhase] = useState<Phase>(() =>
     typeof navigator !== "undefined" && !navigator.onLine ? "offline" : "online",
   );
-  const pendingSync = useSyncStore((s) => s.pending && isSyncConfigured(s.settings));
+  const pendingSync = useAccountStore((s) => s.pending && isSyncConfigured(s));
 
   useEffect(() => {
     let timer: number | null = null;

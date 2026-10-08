@@ -22,7 +22,7 @@ import { Separator } from "@/components/ui/separator";
 import { ConfirmAction } from "@/components/confirm-action";
 import { InstallButton } from "@/components/install-button";
 import { ModeSwitch } from "@/components/mode-switch";
-import { SyncStatusButton } from "@/components/sync/sync-status-button";
+import { SyncStatusButton } from "@/components/account/sync-status-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TripLibraryButton } from "@/components/trip-library-dialog";
 import { TripMarksEditor } from "@/components/trip-marks-editor";

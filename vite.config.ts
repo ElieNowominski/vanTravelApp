@@ -14,38 +14,6 @@ function normalizeBase(value: string): string {
   return base;
 }
 
-/**
- * Dev uniquement : sert le dépôt privé (voyages, réservations) sous /__private/.
- * Rien de ce dossier n'entre dans le bundle.
- */
-function privateDataPlugin(dir: string): Plugin {
-  const root = path.resolve(dir);
-  return {
-    name: "vantravel-private-data",
-    apply: "serve",
-    configureServer(server) {
-      server.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith("/__private/")) return next();
-        const rel = decodeURIComponent(req.url.slice("/__private/".length).split("?")[0]);
-        const file = path.resolve(root, rel);
-        const inside = file.startsWith(root + path.sep);
-        if (!inside || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
-          res.statusCode = 404;
-          res.setHeader("Content-Type", "application/json");
-          res.end(JSON.stringify({ error: "not found", dir: root }));
-          return;
-        }
-        res.setHeader(
-          "Content-Type",
-          file.endsWith(".json") ? "application/json; charset=utf-8" : "application/octet-stream",
-        );
-        res.setHeader("Cache-Control", "no-store");
-        fs.createReadStream(file).pipe(res);
-      });
-    },
-  };
-}
-
 /** GitHub Pages sert 404.html pour les routes inconnues : on y met la SPA. */
 function spaFallbackPlugin(): Plugin {
   let outDir = "dist";
@@ -65,14 +33,12 @@ function spaFallbackPlugin(): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const base = normalizeBase(env.BASE_PATH ?? "/");
-  const privateDir = env.PRIVATE_DATA_DIR ?? "../vanTravel";
 
   return {
     base,
     plugins: [
       react(),
       tailwindcss(),
-      privateDataPlugin(privateDir),
       spaFallbackPlugin(),
       VitePWA({
         registerType: "prompt",
@@ -108,7 +74,6 @@ export default defineConfig(({ mode }) => {
           // Les jeux de données (campings) dépassent 2 Mo : on les veut hors ligne.
           maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
           navigateFallback: `${base}index.html`,
-          navigateFallbackDenylist: [/^\/__private\//],
           runtimeCaching: [
             {
               // Seules les tuiles déjà affichées : pas de préchargement (politique OSM).

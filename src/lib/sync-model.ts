@@ -14,15 +14,16 @@ import type {
 } from "@/lib/types";
 
 /**
- * Modèle de synchronisation entre appareils, sans base de données : trois fichiers JSON par voyage
- * dans le dépôt privé, fusionnés « dernière écriture gagne » par entité.
+ * Modèle de synchronisation entre appareils, fusion « dernière écriture gagne » par entité. Les trois
+ * documents ci-dessous sont la forme de travail de la fusion ; `src/lib/sync-rows.ts` les convertit en
+ * lignes des tables Supabase.
  *
- * - `itinerary.json` : jours, étapes, tronçons, pins, figeage, plus et moins. Produit par la planification,
- *   rarement modifié en voyage : le fichier entier suit la dernière écriture (`updatedAt`).
- * - `travel.json` : par étape (réservations, documents, checklist, notes), par jour (notes, météo),
+ * - `ItineraryDoc` : jours, étapes, tronçons, pins, figeage, plus et moins. Produit par la planification,
+ *   rarement modifié en voyage : le document entier suit la dernière écriture (`updatedAt`).
+ * - `TravelDoc` : par étape (réservations, documents, checklist, notes), par jour (notes, météo),
  *   pierres tombales. Chaque entité porte `updatedAt` : la plus récente gagne, une suppression plus
  *   récente que la dernière écriture gagne sur l'entité.
- * - `expenses.json` : dépenses, fichier à part car les deux personnes en saisissent en même temps.
+ * - `ExpensesDoc` : dépenses, à part car les deux personnes en saisissent en même temps.
  *
  * Tout ici est pur : ni réseau, ni store, ni horloge implicite.
  */
@@ -228,7 +229,7 @@ export function applyTravel(snapshot: TripSnapshot, travel: TravelDoc, expenses:
   return { ...snapshot, stops, days, tombstones: mergeTombstones(travel.tombstones, expenses.tombstones) };
 }
 
-/** Itinéraire sans les données de voyage : c'est ce que `itinerary.json` transporte. */
+/** Itinéraire sans les données de voyage : c'est ce que `ItineraryDoc` transporte. */
 /** Cinq décimales, soit un mètre : assez pour une route, et dix pour cent de fichier en moins. */
 const COORD_DECIMALS = 5;
 
@@ -272,7 +273,7 @@ export function stripTravel(snapshot: TripSnapshot): TripSnapshot {
 
 /**
  * Signature structurelle de l'itinéraire, sans géométrie : change quand la planification change,
- * pas quand on saisit une réservation. Sert à savoir si `itinerary.json` doit être renvoyé.
+ * pas quand on saisit une réservation. Sert à savoir si l'itinéraire doit être renvoyé.
  */
 export function itinerarySignature(snapshot: TripSnapshot): string {
   const days = snapshot.days.map((d) => [d.date, d.overnightStopId, d.locked ? 1 : 0, d.stopIds]);
@@ -362,25 +363,6 @@ export function decideItinerary(input: {
   if (input.localChangedAt) return "push-local";
   if (input.remoteChanged) return "take-remote";
   return "none";
-}
-
-/** Chemin des fichiers d'un voyage dans le dépôt privé. */
-export function tripPaths(tripId: string) {
-  const base = `trips/${tripId}`;
-  return {
-    trip: `${base}/trip.json`,
-    itinerary: `${base}/itinerary.json`,
-    travel: `${base}/travel.json`,
-    expenses: `${base}/expenses.json`,
-    docs: `${base}/docs`,
-  };
-}
-
-/** Document sans chemin (ancienne saisie) : on en déduit un stable. */
-export function documentPath(tripId: string, doc: TripDocument): string {
-  if (doc.path) return doc.path;
-  const ext = doc.kind === "pdf" ? "pdf" : doc.mimeType === "image/png" ? "png" : "jpg";
-  return `${tripPaths(tripId).docs}/${doc.id}.${ext}`;
 }
 
 export function isTravelDoc(value: unknown): value is TravelDoc {

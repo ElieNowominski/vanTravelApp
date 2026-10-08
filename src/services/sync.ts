@@ -1,42 +1,60 @@
-import { getDocumentBlob, putDocumentBlob } from "@/lib/document-store";
+import { deleteDocumentBlob, getDocumentBlob, putDocumentBlob } from "@/lib/document-store";
 import { migrateSnapshot } from "@/lib/migrations";
 import { decryptSecret, encryptSecret } from "@/lib/secure";
 import {
   applyItinerary,
   applyTravel,
   decideItinerary,
-  documentPath,
-  emptyExpensesDoc,
-  emptyTravelDoc,
   extractExpenses,
   extractTravel,
   hasItinerary,
-  isExpensesDoc,
-  isItineraryDoc,
-  isTravelDoc,
   itinerarySignature,
   mergeExpenses,
   mergeTravel,
   resolveItineraryDecision,
   stripTravel,
-  tripPaths,
-  type ExpensesDoc,
   type ItineraryDoc,
   type ItineraryForce,
   type TravelDoc,
 } from "@/lib/sync-model";
+import {
+  expensesToRows,
+  newerDeletions,
+  newerRows,
+  rowsToExpensesDoc,
+  rowsToTombstones,
+  rowsToTravelDoc,
+  storageObjectPath,
+  tombstonesToRows,
+  travelDocToRows,
+} from "@/lib/sync-rows";
 import { describeItinerarySync } from "@/lib/sync-status";
-import { validateTripConfig } from "@/lib/trip-config";
 import type { Booking, TripConfig } from "@/lib/types";
-import { GitHubError, getFile, getFileMeta, getJson, putFile, putJson, type RepoRef } from "@/services/github-repo";
+import { SyncError } from "@/services/supabase";
+import {
+  downloadDocument,
+  fetchDeletions,
+  fetchExpenseRows,
+  fetchItinerary,
+  fetchItineraryMeta,
+  fetchTravelRows,
+  fetchTrip,
+  pushDeletions,
+  pushExpenseRows,
+  pushTravelRows,
+  putItinerary,
+  removeDocument,
+  uploadDocument,
+} from "@/services/supabase-sync";
+import { ensureAccountHydrated, isSyncConfigured, useAccountStore } from "@/store/account-store";
 import { currentAuthor } from "@/store/profile-store";
-import { ensureSyncHydrated, isSyncConfigured, useSyncStore, type SyncSettings } from "@/store/sync-store";
 import { currentSnapshot, useTripStore } from "@/store/trip-store";
 
 /**
- * Moteur de synchronisation : lit les trois fichiers du voyage dans le dépôt privé, fusionne avec
- * l'état local (`src/lib/sync-model.ts`), applique le résultat au store, renvoie ce qui a changé.
- * Un 409 (autre appareil passé entre-temps) relance toute la passe : elle est idempotente.
+ * Moteur de synchronisation : lit le voyage, l'itinéraire, les entités, les dépenses et les suppressions
+ * sur Supabase, fusionne avec l'état local (`src/lib/sync-model.ts`), applique le résultat au store, puis
+ * n'envoie que ce qui est plus récent que le serveur (`src/lib/sync-rows.ts`). Un conflit sur l'itinéraire
+ * (autre appareil passé entre-temps) relance toute la passe : elle est idempotente.
  *
  * Hors ligne, rien ne part : l'état local (IndexedDB) porte les modifications, `pending` reste levé
  * et la passe repart sur `online`, au retour au premier plan et toutes les dix minutes.
@@ -49,22 +67,6 @@ const MAX_ATTEMPTS = 3;
 let running: Promise<SyncOutcome> | null = null;
 let applying = false;
 
-export function repoRef(settings: SyncSettings): RepoRef {
-  return { owner: settings.owner.trim(), repo: settings.repo.trim(), branch: settings.branch.trim() || undefined, token: settings.token.trim() };
-}
-
-export type RemoteTripEntry = { id: string; name: string; regionId?: string; start?: string; end?: string };
-
-/** `trips/index.json` du dépôt privé. */
-export async function listRemoteTrips(settings: SyncSettings): Promise<RemoteTripEntry[]> {
-  const index = await getJson<{ trips?: unknown }>(repoRef(settings), "trips/index.json");
-  if (!index || !Array.isArray(index.data.trips)) return [];
-  return index.data.trips.flatMap((raw): RemoteTripEntry[] => {
-    const t = raw as Partial<RemoteTripEntry> | null;
-    return t && typeof t.id === "string" && typeof t.name === "string" ? [{ id: t.id, name: t.name, regionId: t.regionId, start: t.start, end: t.end }] : [];
-  });
-}
-
 export function syncNow(reason: string, options: SyncOptions = {}): Promise<SyncOutcome> {
   if (running) return running;
   running = run(reason, options).finally(() => {
@@ -74,14 +76,14 @@ export function syncNow(reason: string, options: SyncOptions = {}): Promise<Sync
 }
 
 async function run(reason: string, options: SyncOptions): Promise<SyncOutcome> {
-  await ensureSyncHydrated();
-  const sync = useSyncStore.getState();
-  if (!isSyncConfigured(sync.settings)) return { ok: false, reason: "not-configured" };
+  await ensureAccountHydrated();
+  const account = useAccountStore.getState();
+  if (!isSyncConfigured(account)) return { ok: false, reason: "not-configured" };
   if (typeof navigator !== "undefined" && !navigator.onLine) {
-    sync.fail("", true);
+    account.fail("", true);
     return { ok: false, reason: "offline" };
   }
-  sync.begin();
+  account.begin();
   let lastError: unknown = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -89,82 +91,80 @@ async function run(reason: string, options: SyncOptions): Promise<SyncOutcome> {
       return { ok: true, report };
     } catch (error) {
       lastError = error;
-      if (error instanceof GitHubError && error.isConflict && attempt < MAX_ATTEMPTS) continue;
+      if (error instanceof SyncError && error.isConflict && attempt < MAX_ATTEMPTS) continue;
       break;
     }
   }
   const message = lastError instanceof Error ? lastError.message : "Synchronisation impossible";
-  const offline = lastError instanceof GitHubError && lastError.status === 0 && typeof navigator !== "undefined" && !navigator.onLine;
-  useSyncStore.getState().fail(message, offline);
+  const offline = lastError instanceof SyncError && lastError.kind === "network" && typeof navigator !== "undefined" && !navigator.onLine;
+  useAccountStore.getState().fail(message, offline);
   return { ok: false, reason: offline ? "offline" : "error", message };
 }
 
 async function pass(reason: string, options: SyncOptions): Promise<string> {
-  const sync = useSyncStore.getState();
-  const settings = sync.settings;
-  const ref = repoRef(settings);
-  const tripId = settings.tripId as string;
-  const paths = tripPaths(tripId);
-  const shas: Record<string, string> = { ...sync.shas };
+  const account = useAccountStore.getState();
+  const tripId = account.settings.tripId as string;
+  const passphrase = account.settings.passphrase;
+  const seen: Record<string, string> = { ...account.seen };
   const changes: string[] = [];
 
-  // 1. Le voyage lui-même (dates, véhicule, hébergements), écrit à la main dans le dépôt privé.
+  // 1. Le voyage lui-même (dates, véhicule, hébergements) : la ligne `trips`.
   const trip = useTripStore.getState();
   let config: TripConfig | null = trip.config;
   let tripReset = false;
   if (!config || config.id !== tripId) {
-    const remoteTrip = await getJson<unknown>(ref, paths.trip);
-    if (!remoteTrip) throw new GitHubError(`Aucun ${paths.trip} dans le dépôt`, 404, paths.trip);
-    config = validateTripConfig(remoteTrip.data);
-    shas[paths.trip] = remoteTrip.sha;
+    const remote = await fetchTrip(tripId);
+    if (!remote) throw new SyncError("Voyage introuvable sur le compte (supprimé, ou accès retiré)", "not-found");
+    config = remote.config;
     // Le circuit local (sauvegarde importée, circuit rouvert depuis la bibliothèque) porte souvent un autre
-    // identifiant que trip.json : `setTripConfig` le garde s'il couvre les mêmes dates et `decideItinerary`
-    // tranche ensuite entre lui et le dépôt. Un calendrier différent repart d'un brouillon vierge.
+    // identifiant que le voyage du compte : `setTripConfig` le garde s'il couvre les mêmes dates et
+    // `decideItinerary` tranche ensuite entre lui et le serveur. Un calendrier différent repart d'un brouillon vierge.
     withoutMarking(() => useTripStore.getState().setTripConfig(config as TripConfig));
     tripReset = useTripStore.getState().days !== trip.days;
     changes.push("voyage chargé");
   }
 
-  // 2. Les trois fichiers, en parallèle.
-  const [remoteItin, remoteTravel, remoteExpenses] = await Promise.all([
-    getJson<unknown>(ref, paths.itinerary),
-    getJson<unknown>(ref, paths.travel),
-    getJson<unknown>(ref, paths.expenses),
+  // 2. Tout le reste, en parallèle.
+  const [remoteItin, travelRows, expenseRows, deletionRows] = await Promise.all([
+    fetchItinerary(tripId),
+    fetchTravelRows(tripId),
+    fetchExpenseRows(tripId),
+    fetchDeletions(tripId),
   ]);
 
-  // 3. Itinéraire : fichier entier, dernière écriture gagne.
+  // 3. Itinéraire : document entier, dernière écriture gagne.
   const state = useTripStore.getState();
   let snapshot = currentSnapshot(state);
   let marks = state.marks;
   // Le départ posé automatiquement ne compte pas comme itinéraire, d'un côté comme de l'autre : un brouillon
-  // vide ne l'emporte jamais sur un dépôt qui a un itinéraire, même avec une modification en attente (un
-  // brouillon vidé exprès est repris du dépôt à la passe suivante ; l'historique git garde tout).
+  // vide ne l'emporte jamais sur un serveur qui a un itinéraire, même avec une modification en attente.
   const hasLocal = hasItinerary(snapshot);
-  const remoteItinDoc = remoteItin && isItineraryDoc(remoteItin.data) ? (remoteItin.data as ItineraryDoc) : null;
-  const remoteSnapshot = remoteItinDoc ? migrateSnapshot(remoteItinDoc.snapshot) : null;
+  const remoteSnapshot = remoteItin ? migrateSnapshot(remoteItin.doc.snapshot) : null;
   const hasRemote = !!remoteSnapshot && hasItinerary(remoteSnapshot);
   const auto = decideItinerary({
-    localChangedAt: tripReset ? null : sync.itineraryChangedAt,
-    remoteChanged: !!remoteItin && remoteItin.sha !== sync.shas[paths.itinerary],
-    remoteUpdatedAt: remoteItinDoc?.updatedAt ?? null,
+    localChangedAt: tripReset ? null : account.itineraryChangedAt,
+    remoteChanged: !!remoteItin && remoteItin.updatedAt !== account.seen.itinerary,
+    remoteUpdatedAt: remoteItin?.doc.updatedAt ?? null,
     hasRemote,
     hasLocal,
   });
   const decision = resolveItineraryDecision(auto, options.itinerary ?? "auto", { hasLocal, hasRemote });
-  if (decision === "take-remote" && remoteItinDoc && remoteSnapshot) {
+  if (decision === "take-remote" && remoteItin && remoteSnapshot) {
     snapshot = applyItinerary(snapshot, remoteSnapshot);
-    marks = Array.isArray(remoteItinDoc.marks) ? remoteItinDoc.marks : marks;
-    changes.push(`itinéraire reçu (${remoteItinDoc.updatedBy || "autre appareil"})`);
+    marks = Array.isArray(remoteItin.doc.marks) ? remoteItin.doc.marks : marks;
+    changes.push(`itinéraire reçu (${remoteItin.doc.updatedBy || "autre appareil"})`);
   }
-  if (remoteItin) shas[paths.itinerary] = remoteItin.sha;
+  if (remoteItin) seen.itinerary = remoteItin.updatedAt;
 
   // 4. Données de voyage et dépenses : fusion par entité.
   const now = new Date().toISOString();
-  const remoteTravelDoc = remoteTravel && isTravelDoc(remoteTravel.data) ? await unlockTravel(remoteTravel.data as TravelDoc, settings.passphrase) : emptyTravelDoc();
-  const remoteExpensesDoc = remoteExpenses && isExpensesDoc(remoteExpenses.data) ? (remoteExpenses.data as ExpensesDoc) : emptyExpensesDoc();
+  const remoteTombstones = rowsToTombstones(deletionRows);
+  const remoteTravelDoc = await unlockTravel(rowsToTravelDoc(travelRows, remoteTombstones), passphrase);
+  const remoteExpensesDoc = rowsToExpensesDoc(expenseRows, remoteTombstones);
   const mergedTravel = mergeTravel(extractTravel(snapshot, now), remoteTravelDoc);
   const mergedExpenses = mergeExpenses(extractExpenses(snapshot, now), remoteExpensesDoc);
   snapshot = applyTravel(snapshot, mergedTravel, mergedExpenses);
+  const tombstones = snapshot.tombstones ?? {};
 
   // 5. Application locale, en une écriture, sans relever `pending`.
   withoutMarking(() =>
@@ -176,65 +176,65 @@ async function pass(reason: string, options: SyncOptions): Promise<string> {
       currentDayIndex: snapshot.currentDayIndex,
       frozenAt: snapshot.frozenAt ?? null,
       marks,
-      tombstones: snapshot.tombstones ?? {},
+      tombstones,
       ...(decision === "take-remote" && config ? { activeSavedName: config.name } : {}),
     }),
   );
 
-  // 6. Envois : seulement ce qui diffère du dépôt.
+  // 6. Envois : seulement ce qui est plus récent que le serveur (qui le revérifie de son côté).
   const author = currentAuthor();
   if (decision === "push-local") {
     const doc: ItineraryDoc = { format: 1, updatedAt: now, updatedBy: author, snapshot: stripTravel(snapshot), marks };
-    const put = await putJson(ref, paths.itinerary, doc, `Itinéraire (${author})`, remoteItin?.sha ?? null, { compact: true });
-    shas[paths.itinerary] = put.sha;
+    seen.itinerary = await putItinerary(tripId, doc, remoteItin?.updatedAt ?? null);
     changes.push("itinéraire envoyé");
   }
-  const sealedTravel = await sealTravel(mergedTravel, remoteTravelDoc, settings.passphrase);
-  if (!remoteTravel || !sameDoc(sealedTravel, remoteTravel.data)) {
-    const put = await putJson(ref, paths.travel, { ...sealedTravel, updatedAt: now }, `Réservations et notes (${author})`, remoteTravel?.sha ?? null);
-    shas[paths.travel] = put.sha;
-    changes.push("réservations envoyées");
-  } else {
-    shas[paths.travel] = remoteTravel.sha;
+  const sealedTravel = await sealTravel(mergedTravel, remoteTravelDoc, passphrase, now);
+  const travelToPush = newerRows(travelDocToRows(tripId, sealedTravel), travelRows);
+  if (travelToPush.length > 0) {
+    await pushTravelRows(travelToPush);
+    changes.push(plural(travelToPush.length, "entrée envoyée", "entrées envoyées"));
   }
-  if (!remoteExpenses || !sameDoc(mergedExpenses, remoteExpenses.data)) {
-    const put = await putJson(ref, paths.expenses, { ...mergedExpenses, updatedAt: now }, `Dépenses (${author})`, remoteExpenses?.sha ?? null);
-    shas[paths.expenses] = put.sha;
-    changes.push("dépenses envoyées");
-  } else {
-    shas[paths.expenses] = remoteExpenses.sha;
+  const expensesToPush = newerRows(expensesToRows(tripId, mergedExpenses), expenseRows);
+  if (expensesToPush.length > 0) {
+    await pushExpenseRows(expensesToPush);
+    changes.push(plural(expensesToPush.length, "dépense envoyée", "dépenses envoyées"));
   }
+  const deletionsToPush = newerDeletions(tombstonesToRows(tripId, tombstones), deletionRows);
+  if (deletionsToPush.length > 0) await pushDeletions(deletionsToPush);
 
   // 7. Documents : contenu manquant d'un côté ou de l'autre. Jamais bloquant.
-  const docs = await syncDocuments(ref, tripId, mergedTravel, shas);
-  if (docs.uploaded) changes.push(`${docs.uploaded} document${docs.uploaded > 1 ? "s" : ""} envoyé${docs.uploaded > 1 ? "s" : ""}`);
-  if (docs.downloaded) changes.push(`${docs.downloaded} document${docs.downloaded > 1 ? "s" : ""} reçu${docs.downloaded > 1 ? "s" : ""}`);
-  if (docs.failed) changes.push(`${docs.failed} document${docs.failed > 1 ? "s" : ""} en attente`);
+  const docs = await syncDocuments(tripId, mergedTravel, tombstones, seen);
+  if (docs.uploaded) changes.push(plural(docs.uploaded, "document envoyé", "documents envoyés"));
+  if (docs.downloaded) changes.push(plural(docs.downloaded, "document reçu", "documents reçus"));
+  if (docs.failed) changes.push(plural(docs.failed, "document en attente", "documents en attente"));
 
-  // 8. Rien d'aucun côté : le plan écrit dans trip.json sert de point de départ, comme en dev. Les routes
-  // se calculent en arrière-plan ; le planificateur enverra l'itinéraire obtenu à la passe suivante.
+  // 8. Rien d'aucun côté : le plan du voyage sert de point de départ. Les routes se calculent en
+  // arrière-plan ; le planificateur enverra l'itinéraire obtenu à la passe suivante.
   const seedPlan = decision === "none" && !hasLocal && config.plan.days.length > 0;
   if (seedPlan) changes.push("plan du voyage chargé");
 
   const report = changes.length > 0 ? changes.join(", ") : "à jour";
-  useSyncStore.getState().finish(`${report} (${reason})`, shas);
+  useAccountStore.getState().finish(`${report} (${reason})`, seen);
   if (seedPlan) void useTripStore.getState().loadCatalogPlan();
   return report;
 }
 
-/** Annonce, sans rien écrire, ce que la prochaine synchro ferait de l'itinéraire (sha seul côté dépôt). */
+/** Annonce, sans rien écrire, ce que la prochaine synchro ferait de l'itinéraire (`updated_at` seul côté serveur). */
 export async function previewItinerarySync(): Promise<string> {
-  await ensureSyncHydrated();
-  const sync = useSyncStore.getState();
-  if (!isSyncConfigured(sync.settings)) return "";
-  const path = tripPaths(sync.settings.tripId as string).itinerary;
-  const meta = await getFileMeta(repoRef(sync.settings), path);
+  await ensureAccountHydrated();
+  const account = useAccountStore.getState();
+  if (!isSyncConfigured(account)) return "";
+  const meta = await fetchItineraryMeta(account.settings.tripId as string);
   return describeItinerarySync({
     hasLocal: hasItinerary(currentSnapshot(useTripStore.getState())),
-    localChangedAt: sync.itineraryChangedAt,
-    hasRemote: !!meta,
-    remoteChanged: !!meta && meta.sha !== sync.shas[path],
+    localChangedAt: account.itineraryChangedAt,
+    hasRemote: meta !== null,
+    remoteChanged: meta !== null && meta !== account.seen.itinerary,
   });
+}
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n > 1 ? many : one}`;
 }
 
 /** Les écritures venues de la synchro ne doivent pas relever `pending`. */
@@ -245,12 +245,6 @@ function withoutMarking(fn: () => void): void {
   } finally {
     applying = false;
   }
-}
-
-/** Même contenu, à `updatedAt` près (qui change à chaque passe). */
-function sameDoc(a: unknown, b: unknown): boolean {
-  const strip = (v: unknown) => JSON.stringify(v, (key, value: unknown) => (key === "updatedAt" && typeof value === "string" && value === (v as { updatedAt?: string }).updatedAt ? undefined : value));
-  return strip(a) === strip(b);
 }
 
 /** Déchiffre les codes reçus quand la phrase est connue ; sinon ils restent sous enveloppe. */
@@ -273,10 +267,11 @@ async function unlockTravel(doc: TravelDoc, passphrase: string): Promise<TravelD
 }
 
 /**
- * Prépare le fichier à envoyer : avec une phrase, les codes en clair sont chiffrés (enveloppe conservée
- * si le code n'a pas changé, pour ne pas réécrire le fichier à chaque passe) ; sans phrase, rien ne bouge.
+ * Prépare ce qui part : avec une phrase, les codes en clair sont chiffrés. L'enveloppe est réutilisée si le
+ * code n'a pas changé (rien à renvoyer) ; un code que le serveur détient en clair est redaté de `now` pour
+ * que le serveur, qui n'accepte qu'une ligne plus récente, remplace le clair par l'enveloppe. Sans phrase, rien ne bouge.
  */
-async function sealTravel(doc: TravelDoc, remote: TravelDoc, passphrase: string): Promise<TravelDoc> {
+async function sealTravel(doc: TravelDoc, remote: TravelDoc, passphrase: string, now: string): Promise<TravelDoc> {
   if (!passphrase) return doc;
   const remoteBookings = new Map<string, Booking>();
   for (const stop of Object.values(remote.stops)) for (const b of stop.bookings) remoteBookings.set(b.id, b);
@@ -290,46 +285,55 @@ async function sealTravel(doc: TravelDoc, remote: TravelDoc, passphrase: string)
       }
       const previous = remoteBookings.get(booking.id);
       const reuse = previous?.accessCodeSecure && previous.updatedAt === booking.updatedAt && previous.accessCode === booking.accessCode ? previous.accessCodeSecure : null;
+      const plainOnServer = !!previous && !previous.accessCodeSecure && previous.updatedAt === booking.updatedAt;
       const { accessCode: _plain, ...rest } = booking;
       void _plain;
-      bookings.push({ ...rest, accessCodeSecure: reuse ?? (await encryptSecret(booking.accessCode, passphrase)) });
+      bookings.push({
+        ...rest,
+        ...(plainOnServer ? { updatedAt: now } : {}),
+        accessCodeSecure: reuse ?? (await encryptSecret(booking.accessCode, passphrase)),
+      });
     }
     stops[id] = { ...stop, bookings };
   }
   return { ...doc, stops };
 }
 
-async function syncDocuments(ref: RepoRef, tripId: string, travel: TravelDoc, shas: Record<string, string>) {
+async function syncDocuments(tripId: string, travel: TravelDoc, tombstones: Record<string, string>, seen: Record<string, string>) {
   let uploaded = 0;
   let downloaded = 0;
   let failed = 0;
   for (const stop of Object.values(travel.stops)) {
     for (const doc of stop.documents) {
-      const path = documentPath(tripId, doc);
+      const path = storageObjectPath(tripId, doc);
+      const key = `doc:${doc.id}`;
       try {
         const local = await getDocumentBlob(doc.id);
-        if (local && !shas[path]) {
-          try {
-            const put = await putFile(ref, path, new Uint8Array(await local.arrayBuffer()), `Document ${doc.id}`, null);
-            shas[path] = put.sha;
-            uploaded++;
-          } catch (error) {
-            // Déjà présent (envoyé par l'autre appareil) : on note son sha sans le réécrire.
-            if (!(error instanceof GitHubError && error.isConflict)) throw error;
-            const existing = await getFile(ref, path);
-            if (existing) shas[path] = existing.sha;
-          }
+        if (local && !seen[key]) {
+          if ((await uploadDocument(path, local, doc.mimeType)) === "uploaded") uploaded++;
+          seen[key] = path;
         } else if (!local) {
-          const remote = await getFile(ref, path);
+          const remote = await downloadDocument(path);
           if (remote) {
-            await putDocumentBlob(doc.id, new Blob([remote.bytes as BlobPart], { type: doc.mimeType }));
-            shas[path] = remote.sha;
+            await putDocumentBlob(doc.id, new Blob([remote], { type: doc.mimeType }));
+            seen[key] = path;
             downloaded++;
           }
         }
       } catch {
         failed++;
       }
+    }
+  }
+  // Documents supprimés : le fichier quitte le bucket et cet appareil, une fois.
+  for (const [id, at] of Object.entries(tombstones)) {
+    if (!id.startsWith("doc-") || seen[`gone:${id}`]) continue;
+    try {
+      await removeDocument(tripId, id);
+      await deleteDocumentBlob(id);
+      seen[`gone:${id}`] = at;
+    } catch {
+      /* retenté à la prochaine passe */
     }
   }
   return { uploaded, downloaded, failed };
@@ -348,8 +352,8 @@ export function startSyncScheduler(): () => void {
   if (scheduler) return scheduler.stop;
   let debounce: number | null = null;
   const kick = (reason: string) => {
-    const sync = useSyncStore.getState();
-    if (!sync.settings.autoSync || !isSyncConfigured(sync.settings)) return;
+    const account = useAccountStore.getState();
+    if (!account.settings.autoSync || !isSyncConfigured(account)) return;
     if (debounce) window.clearTimeout(debounce);
     debounce = window.setTimeout(() => void syncNow(reason), DEBOUNCE_MS);
   };
@@ -363,24 +367,24 @@ export function startSyncScheduler(): () => void {
     const travel = structural || next.marks !== prev.marks || next.tombstones !== prev.tombstones;
     if (!travel) return;
     const itineraryChanged = structural && itinerarySignature(currentSnapshot(next)) !== itinerarySignature(currentSnapshot(prev));
-    useSyncStore.getState().markPending(itineraryChanged);
+    useAccountStore.getState().markPending(itineraryChanged);
     kick("modification");
   });
 
   const onOnline = () => kick("retour du réseau");
   const onVisible = () => {
     if (document.visibilityState !== "visible") return;
-    const sync = useSyncStore.getState();
-    const stale = !sync.lastSyncAt || Date.now() - new Date(sync.lastSyncAt).getTime() > STALE_MS;
-    if (sync.pending || stale) kick("premier plan");
+    const account = useAccountStore.getState();
+    const stale = !account.lastSyncAt || Date.now() - new Date(account.lastSyncAt).getTime() > STALE_MS;
+    if (account.pending || stale) kick("premier plan");
   };
   window.addEventListener("online", onOnline);
   document.addEventListener("visibilitychange", onVisible);
   const interval = window.setInterval(() => kick("vérification périodique"), INTERVAL_MS);
 
-  void ensureSyncHydrated().then(() => {
-    const sync = useSyncStore.getState();
-    if (isSyncConfigured(sync.settings) && sync.settings.autoSync) void syncNow("ouverture");
+  void ensureAccountHydrated().then(() => {
+    const account = useAccountStore.getState();
+    if (isSyncConfigured(account) && account.settings.autoSync) void syncNow("ouverture");
   });
 
   scheduler = {

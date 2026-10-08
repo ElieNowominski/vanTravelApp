@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { idbStorage } from "@/lib/idb-storage";
 import { defaultProfile, type Profile } from "@/lib/profile";
+import { useAccountStore } from "@/store/account-store";
 
 export const PROFILE_STORAGE_KEY = "vantravel-profile-v1";
 
@@ -34,7 +35,10 @@ export const useProfileStore = create<ProfileState>()(
   ),
 );
 
-/** Prénom courant pour `updatedBy`, lisible hors React (actions du store voyage). */
+/** Prénom courant pour `updatedBy`, lisible hors React : le profil local, sinon le prénom du compte. */
 export function currentAuthor(): string {
-  return useProfileStore.getState().profile.name.trim() || "moi";
+  const local = useProfileStore.getState().profile.name.trim();
+  if (local) return local;
+  const account = useAccountStore.getState().user?.displayName.trim().split(/\s+/)[0];
+  return account || "moi";
 }

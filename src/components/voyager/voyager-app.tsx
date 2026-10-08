@@ -4,7 +4,7 @@ import { BookOpen, CalendarDays, ChevronRight, Moon, Receipt } from "lucide-reac
 import { InstallButton } from "@/components/install-button";
 import { ModeSwitch } from "@/components/mode-switch";
 import { NetworkBanner } from "@/components/network-banner";
-import { SyncStatusButton } from "@/components/sync/sync-status-button";
+import { SyncStatusButton } from "@/components/account/sync-status-button";
 import { UpdateBanner } from "@/components/update-banner";
 import { Button } from "@/components/ui/button";
 import { DayStrip } from "@/components/voyager/day-strip";

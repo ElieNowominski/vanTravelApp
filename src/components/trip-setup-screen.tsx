@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { Cloud, FolderOpen, MapPinned, Upload } from "lucide-react";
-import { SyncStatusButton } from "@/components/sync/sync-status-button";
+import { SyncStatusButton } from "@/components/account/sync-status-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -106,11 +106,11 @@ export function TripSetupScreen() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Cloud className="size-4" />
-            Depuis le dépôt privé
+            Depuis ton compte
           </CardTitle>
           <CardDescription>
-            Le voyage partagé sur GitHub : colle ton token, choisis le voyage, tout arrive ici et reste synchronisé avec l’autre
-            téléphone.
+            Connecte-toi (Google ou e-mail) : le voyage partagé arrive ici et reste synchronisé avec l’autre téléphone. Un voyage
+            créé ci-dessous peut ensuite être mis sur le compte depuis le même bouton.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -230,12 +230,6 @@ export function TripSetupScreen() {
         </CardContent>
       </Card>
 
-      {import.meta.env.DEV && (
-        <p className="text-xs text-muted-foreground">
-          Mode développement : le voyage du dépôt privé se charge tout seul s’il existe (variable
-          PRIVATE_DATA_DIR, fichier trips/index.json).
-        </p>
-      )}
       </div>
     </main>
   );

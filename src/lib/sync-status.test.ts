@@ -19,7 +19,7 @@ describe("describeItinerarySync", () => {
     expect(describeItinerarySync({ hasLocal: false, localChangedAt: null, hasRemote: false, remoteChanged: false })).toMatch(/plan du voyage/);
     expect(describeItinerarySync({ hasLocal: false, localChangedAt: null, hasRemote: true, remoteChanged: true })).toMatch(/sera reçu/);
     expect(describeItinerarySync({ hasLocal: true, localChangedAt: T, hasRemote: true, remoteChanged: true })).toMatch(/Recevoir » ou « Envoyer/);
-    expect(describeItinerarySync({ hasLocal: true, localChangedAt: T, hasRemote: true, remoteChanged: false })).toMatch(/sera envoyé au dépôt/);
+    expect(describeItinerarySync({ hasLocal: true, localChangedAt: T, hasRemote: true, remoteChanged: false })).toMatch(/sera envoyé au compte/);
     expect(describeItinerarySync({ hasLocal: true, localChangedAt: null, hasRemote: true, remoteChanged: true })).toMatch(/remplacera celui de cet appareil/);
     expect(describeItinerarySync({ hasLocal: true, localChangedAt: null, hasRemote: true, remoteChanged: false })).toMatch(/identique/);
   });

@@ -6,7 +6,6 @@ import {
   hasItinerary,
   resolveItineraryDecision,
   roundLegCoordinates,
-  documentPath,
   emptyExpensesDoc,
   emptyTravelDoc,
   extractExpenses,
@@ -205,9 +204,4 @@ describe("itinéraire", () => {
     expect(hasItinerary(snapshot())).toBe(true);
   });
 
-  it("documentPath respecte le chemin existant et en déduit un sinon", () => {
-    const doc = { id: "doc-1", updatedAt: T0, updatedBy: "x", kind: "image" as const, path: "", size: 1, mimeType: "image/jpeg" };
-    expect(documentPath("nz", doc)).toBe("trips/nz/docs/doc-1.jpg");
-    expect(documentPath("nz", { ...doc, path: "trips/nz/docs/custom.jpg" })).toBe("trips/nz/docs/custom.jpg");
-  });
 });

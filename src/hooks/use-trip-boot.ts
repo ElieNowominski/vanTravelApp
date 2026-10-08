@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
+import { listMemberTrips } from "@/services/supabase-sync";
 import { syncNow } from "@/services/sync";
-import { loadDevTrip } from "@/services/trip-source";
-import { ensureSyncHydrated, isSyncConfigured, useSyncStore } from "@/store/sync-store";
+import { ensureAccountHydrated, isSyncConfigured, useAccountStore } from "@/store/account-store";
 import { useTripStore } from "@/store/trip-store";
 
 /**
- * Réhydrate le brouillon (IndexedDB) puis, sans voyage chargé : synchro depuis le dépôt privé si elle
- * est configurée, sinon en dev le voyage servi sous /__private/. Partagé par l'écran principal et le roadbook.
+ * Réhydrate le brouillon (IndexedDB) puis, sans voyage chargé et avec un compte : prend le voyage
+ * mémorisé (ou le premier du compte) et le synchronise. Partagé par l'écran principal et le roadbook.
+ * Sans compte, l'écran de démarrage prend la main.
  */
 export function useTripBoot(): boolean {
   const [ready, setReady] = useState(false);
@@ -14,23 +15,20 @@ export function useTripBoot(): boolean {
   useEffect(() => {
     let cancelled = false;
     const boot = async () => {
-      await Promise.all([Promise.resolve(useTripStore.persist.rehydrate()), ensureSyncHydrated()]);
-      if (!useTripStore.getState().config) {
-        if (isSyncConfigured(useSyncStore.getState().settings)) {
-          // Nouvel appareil déjà configuré : le voyage et l'itinéraire viennent du dépôt.
-          await syncNow("démarrage");
+      await Promise.all([Promise.resolve(useTripStore.persist.rehydrate()), ensureAccountHydrated()]);
+      if (useTripStore.getState().config) return;
+      const account = useAccountStore.getState();
+      if (!account.user) return;
+      if (!account.settings.tripId && (typeof navigator === "undefined" || navigator.onLine)) {
+        try {
+          const trips = await listMemberTrips();
+          if (trips[0] && !cancelled) account.setSettings({ tripId: trips[0].id });
+        } catch {
+          /* hors ligne ou session expirée : l'écran de démarrage le dira */
         }
       }
-      if (!useTripStore.getState().config) {
-        const dev = await loadDevTrip();
-        if (dev && !cancelled) {
-          useTripStore.getState().setTripConfig(dev);
-          // Premier lancement sur cet appareil : on pose le plan du voyage (routes recalculées).
-          if (dev.plan.days.length > 0 && useTripStore.getState().legs.length === 0) {
-            void useTripStore.getState().loadCatalogPlan();
-          }
-        }
-      }
+      // Nouvel appareil déjà connecté : le voyage et l'itinéraire viennent du compte.
+      if (isSyncConfigured(useAccountStore.getState())) await syncNow("démarrage");
     };
     void boot().finally(() => {
       if (!cancelled) setReady(true);
