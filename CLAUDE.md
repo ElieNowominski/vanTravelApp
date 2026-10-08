@@ -15,7 +15,7 @@ Backend : un projet **Supabase** (Auth Google ou e-mail, Postgres avec règles p
 7. **Logique métier dans `src/lib`, pure et testée avec Vitest** ; les composants n'hébergent pas de calcul. Les services réseau vivent dans `src/services`.
 8. **Sources externes** : respecter les politiques d'usage (attribution OSM et OSRM, pas de préchargement de tuiles OSM, une requête par seconde vers OSRM).
 9. **Port de dev 43217** : le libérer après tout test (voir `.cursor/rules/liberer-port-dev.mdc`).
-10. **Git : commits directement sur `main`**, hotfix compris. Une seule personne travaille ici et chaque push déploie sur Pages. Pas de branche ni de PR sauf demande explicite (exception en cours : la phase 7 vit sur la branche `supabase` jusqu'à validation à deux téléphones, `main` continuant de déployer la version GitHub). Avant chaque commit : lint, typecheck, tests, et le contrôle « aucune donnée perso » de `.cursor/rules/donnees-perso-et-securite.mdc`.
+10. **Git : commits directement sur `main`**, hotfix compris. Une seule personne travaille ici et chaque push déploie sur Pages. Pas de branche ni de PR sauf demande explicite (la phase 7 a vécu sur la branche `supabase` du 8 oct. 2026 jusqu'à sa fusion le jour même). Avant chaque commit : lint, typecheck, tests, et le contrôle « aucune donnée perso » de `.cursor/rules/donnees-perso-et-securite.mdc`.
 11. **Journal en fin de session** : ajouter une entrée dans `docs/JOURNAL.md` selon son gabarit (intention, demandes en substance, livré, cassé ou appris dont les erreurs de l'assistant, décisions avec leur raison, chiffres). Elle sert au retour d'expérience sur la construction de l'app : écrire ce que git ne dit pas, sans donnée personnelle.
 
 ## Synchro (phase 7, Supabase)
