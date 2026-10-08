@@ -178,7 +178,10 @@ create policy "profil : soi-même" on public.profiles for all using (id = auth.u
 create policy "profils des co-membres en lecture" on public.profiles for select
   using (exists (select 1 from public.members a join public.members b on a.trip_id = b.trip_id where a.user_id = auth.uid() and b.user_id = profiles.id));
 
-create policy "voyage : membres en lecture" on public.trips for select using (public.is_member(id));
+-- Le propriétaire lit son voyage même sans ligne members : sinon create_trip (qui insère trips puis
+-- members, dont la policy relit trips) échoue en boucle (migration 0003).
+create policy "voyage : membres ou propriétaire en lecture" on public.trips for select
+  using (public.is_member(id) or owner_id = auth.uid());
 create policy "voyage : création par son propriétaire" on public.trips for insert with check (owner_id = auth.uid());
 create policy "voyage : modification par le propriétaire" on public.trips for update using (owner_id = auth.uid());
 create policy "voyage : suppression par le propriétaire" on public.trips for delete using (owner_id = auth.uid());

@@ -97,6 +97,10 @@ async function main() {
     const { error: e5 } = await a.client.storage.from("documents").upload(docPath, new Blob(["rls"], { type: "text/plain" }), { upsert: false, contentType: "text/plain" });
     check("A envoie un document", !e5, e5?.message);
   }
+  if (results.some((r) => !r.ok)) {
+    console.log("\nLa mise en place par A échoue : les contrôles suivants n'auraient pas de sens. Vérifie que toutes les migrations de supabase/migrations/ ont été exécutées (SQL Editor), puis relance.");
+    process.exit(2);
+  }
 
   // 5. Anonyme.
   {
@@ -156,10 +160,10 @@ async function main() {
     const { data: profiles } = await asB.from("profiles").select("id").eq("id", a.user.id);
     check("B membre : voit le profil de A", (profiles ?? []).length === 1);
     // Verrou optimiste : une écriture avec un updated_at périmé ne touche rien.
-    const { data: current } = await asB.from("itineraries").select("updated_at").eq("trip_id", TRIP).single();
+    const { data: current } = await asB.from("itineraries").select("updated_at").eq("trip_id", TRIP).maybeSingle();
     const { data: stale } = await asB.from("itineraries").update({ updated_by: "b" }).eq("trip_id", TRIP).eq("updated_at", "2000-01-01T00:00:00Z").select();
-    const { data: fresh } = await asB.from("itineraries").update({ updated_by: "b" }).eq("trip_id", TRIP).eq("updated_at", current.updated_at).select();
-    check("verrou optimiste : updated_at périmé = 0 ligne, à jour = 1 ligne", (stale ?? []).length === 0 && (fresh ?? []).length === 1);
+    const { data: fresh } = current ? await asB.from("itineraries").update({ updated_by: "b" }).eq("trip_id", TRIP).eq("updated_at", current.updated_at).select() : { data: [] };
+    check("verrou optimiste : updated_at périmé = 0 ligne, à jour = 1 ligne", !!current && (stale ?? []).length === 0 && (fresh ?? []).length === 1);
     // Upsert « si plus récent » : une ligne plus ancienne est ignorée.
     const old = { ...item, payload: { ...item.payload, provider: "Vieux" }, updated_at: "2000-01-01T00:00:00Z" };
     await asB.rpc("upsert_travel_items", { items: [old] });
