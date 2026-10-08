@@ -2,6 +2,18 @@
 
 Plan d'intégration, écrit le 8 octobre 2026, à lire après `CLAUDE.md`, `docs/ARCHITECTURE.md` et `docs/PLAN.md`. Il sert d'entrée à une nouvelle session de travail. Les faits sur Supabase (clés, pause, quotas) ont été vérifiés le 7 octobre 2026 sur les pages officielles ; les revérifier s'ils changent la décision.
 
+## 0. État au 8 octobre 2026
+
+Lots A à G livrés sur la branche `supabase` (voir `docs/PLAN.md`, phase 7, et le journal). Écarts au plan d'origine, avec la raison :
+
+- clés primaires composées (`trip_id`, `id`) sur `travel_items` et `expenses` : `<date>:notes` existe dans tous les voyages, un identifiant d'entité n'est unique que dans son voyage ; d'où la migration `supabase/migrations/0002_functions_and_keys.sql` à exécuter sur le projet existant (elle ajoute aussi `upsert_expenses`, `upsert_deletions`, `create_trip`, le trigger des profils et les policies de suppression) ;
+- pas de lecture incrémentale `since` : tout est relu à chaque passe et comparé localement (`newerRows`), plus simple et exact pour quelques centaines de lignes ;
+- script de migration sans clé secrète : connexion e-mail et mot de passe du propriétaire, mêmes règles RLS que l'app ; ou, plus simple, « Mettre « nom » sur le compte » depuis le PC qui a tout en local ;
+- `currentAuthor()` garde le prénom du profil local (c'est lui qui est demandé à l'écran) et prend le prénom du compte en repli, prérempli à la première connexion ;
+- un code d'accès que le serveur détient en clair est redaté quand une phrase est posée, sinon le serveur (qui n'accepte qu'une ligne plus récente) garderait le clair.
+
+Reste à faire par la personne : section « Mise en service (phase 7) » de `docs/PLAN.md`. Le schéma de référence est désormais `supabase/schema.sql` ; la section 3 ci-dessous est le schéma initial tel qu'exécuté le 8 octobre.
+
 ## 1. Pourquoi, et ce qui ne change pas
 
 **Motif.** Les photos et PDF du voyage ne doivent pas être stockés chez GitHub, même dans un dépôt privé, et l'app doit pouvoir accueillir d'autres personnes avec des comptes (Google ou e-mail et mot de passe). La synchro actuelle par dépôt GitHub fonctionne (corrigée le 7 octobre), mais elle n'offre ni l'un ni l'autre.

@@ -1,0 +1,28 @@
+name: Keep Supabase awake
+
+# Le projet Supabase gratuit se met en pause après une semaine sans requête : un appel tous les deux
+# jours à la fonction `beat()` (clé publiable, aucune donnée) suffit. Rappel : GitHub désactive les
+# workflows planifiés après 60 jours sans activité du dépôt ; `workflow_dispatch` permet de relancer à la main.
+
+on:
+  schedule:
+    - cron: "17 6 */2 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  beat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Appel de beat()
+        env:
+          SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$SUPABASE_URL" && test -n "$SUPABASE_KEY" || { echo "Variables VITE_SUPABASE_URL et VITE_SUPABASE_PUBLISHABLE_KEY manquantes"; exit 1; }
+          code=$(curl -sS -o /dev/null -w "%{http_code}" -X POST "$SUPABASE_URL/rest/v1/rpc/beat" \
+            -H "apikey: $SUPABASE_KEY" -H "Authorization: Bearer $SUPABASE_KEY" -H "Content-Type: application/json" -d '{}')
+          echo "beat() -> HTTP $code"
+          test "$code" = "204" || test "$code" = "200"

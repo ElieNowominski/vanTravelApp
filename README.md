@@ -2,7 +2,7 @@
 
 Application personnelle de roadtrip en van, pour deux personnes, sur téléphone et sur PC. Deux modes : **Planifier** (carte, catalogue de villes et de spots, campings DOC et OSM, tracés routiers, comparaison de circuits) et **Voyager** (écran « Aujourd'hui », nuit du soir avec référence et code, réservations, photos et PDF, checklists, notes, journal des dépenses, roadbook imprimable ; tout marche hors ligne). Voyager s'ouvre par défaut pendant le voyage ou une fois l'itinéraire figé ; la bascule est dans l'en-tête.
 
-Site statique déployé sur GitHub Pages, installable comme PWA. Aucun serveur, aucune base de données.
+Site statique déployé sur GitHub Pages, installable comme PWA. Pas de serveur à nous : les données partagées vivent dans un projet Supabase (comptes Google ou e-mail, Postgres avec règles par ligne, Storage pour les photos et PDF).
 
 ## Où sont les données
 
@@ -10,20 +10,21 @@ Site statique déployé sur GitHub Pages, installable comme PWA. Aucun serveur, 
 | --- | --- |
 | Ce dépôt (public) | Code, catalogue générique par région (`src/data/catalog/`), préréglages de région (`src/data/regions/`) |
 | `public/data/generated/` (ignoré par git) | Campings DOC, aires OSM, freedom camping : produits par `npm run data`, régénérés par le workflow |
-| Dépôt **privé** `vanTravel` | Les voyages : `trips/index.json` et `trips/<id>/trip.json` (dates, véhicule, hébergements réservés, plan). Plus tard réservations, codes, documents |
+| Supabase (compte par personne) | Les voyages (`trips`, même format que `trip.json` ci-dessous), l'itinéraire, les réservations, coches, notes, dépenses, suppressions, et les photos et PDF (bucket `documents`). Schéma : `supabase/schema.sql`, règles d'accès par voyage (`members`) |
 | Le navigateur | Circuit courant, bibliothèque de circuits, réservations, checklists, dépenses, contenu des documents, profil (IndexedDB, par appareil) |
 
-Rien de personnel n'entre dans ce dépôt : voir `.cursor/rules/donnees-perso-et-securite.mdc`.
+Rien de personnel ni de clé secrète n'entre dans ce dépôt : voir `.cursor/rules/donnees-perso-et-securite.mdc`. L'ancien dépôt privé `vanTravel` (`trips/`) est une archive, migrable par `scripts/migrate-from-private-repo.mjs`.
 
 ## Lancer en local
 
 ```bash
 npm install
+cp .env.example .env.local   # puis VITE_SUPABASE_URL et VITE_SUPABASE_PUBLISHABLE_KEY du projet (clé publiable, jamais la secrète)
 npm run data        # une fois : télécharge les jeux de données publics
 npm run dev         # http://127.0.0.1:43217
 ```
 
-En développement, Vite sert le dépôt privé sous `/__private/` depuis le dossier `PRIVATE_DATA_DIR` (par défaut `../vanTravel`, voir `.env.example`). Si `trips/index.json` y existe, le premier voyage se charge tout seul. Sinon l'écran de démarrage propose d'importer une sauvegarde ou de créer un voyage.
+Sans `.env.local`, l'app tourne en « local seulement » : pas de compte ni de synchro, tout le reste marche. Pour tester depuis un téléphone sur le même Wi-Fi : `http://<ip-du-pc>:43217/` (connexion par e-mail ; Google exige une origine déclarée dans Supabase).
 
 ## Commandes
 
@@ -38,7 +39,7 @@ En développement, Vite sert le dépôt privé sous `/__private/` depuis le doss
 | `npm run data [region] [--strict]` | Jeux de données publics vers `public/data/generated/` |
 | `npm run icons` | Icônes PWA à partir de `public/logo.svg` |
 
-## Format d'un voyage (`trip.json`, dépôt privé)
+## Format d'un voyage (`trips.config`, ou `trip.json` à importer)
 
 ```json
 {
@@ -59,11 +60,13 @@ En développement, Vite sert le dépôt privé sous `/__private/` depuis le doss
 
 ## Sauvegarde et migration depuis l'ancienne version
 
-La bibliothèque (icône dossier) exporte un JSON avec le circuit affiché, tous les circuits enregistrés (tracés compris) et le contenu des documents. L'import fusionne sans écraser ce qui est plus récent. Tant que la synchronisation (phase 5) n'existe pas, c'est le seul pont entre deux appareils. Le fichier produit par le snippet console de l'ancienne version (Next.js) est accepté tel quel : les circuits sans voyage en reçoivent un, dérivé de leurs dates et de leurs étapes.
+La bibliothèque (icône dossier) exporte un JSON avec le circuit affiché, tous les circuits enregistrés (tracés compris) et le contenu des documents. L'import fusionne sans écraser ce qui est plus récent. C'est le plan B quand le compte n'est pas accessible ; le pont normal entre appareils est la synchro (bouton nuage : compte, voyage, membres). Le fichier produit par le snippet console de l'ancienne version (Next.js) est accepté tel quel : les circuits sans voyage en reçoivent un, dérivé de leurs dates et de leurs étapes.
 
 ## Déploiement
 
-Le workflow `.github/workflows/deploy.yml` lint, teste, télécharge les données, construit avec `BASE_PATH=/<nom-du-dépôt>/` et publie sur GitHub Pages à chaque push sur `main`, plus un rafraîchissement hebdomadaire des données. Activer Pages une fois dans les réglages du dépôt : *Settings > Pages > Source : GitHub Actions*.
+Le workflow `.github/workflows/deploy.yml` lint, teste, télécharge les données, construit avec `BASE_PATH=/<nom-du-dépôt>/` et les variables du dépôt `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_KEY` (*Settings > Secrets and variables > Actions > Variables*), puis publie sur GitHub Pages à chaque push sur `main`, plus un rafraîchissement hebdomadaire des données. Activer Pages une fois : *Settings > Pages > Source : GitHub Actions*. `keepalive.yml` appelle `beat()` tous les deux jours pour que le projet Supabase gratuit ne se mette pas en pause.
+
+Côté Supabase : exécuter `supabase/schema.sql` (projet neuf) ou les migrations de `supabase/migrations/` (projet existant) dans SQL Editor, puis `node scripts/rls-check.mjs` avec deux comptes de test (variables d'environnement, voir l'en-tête du script).
 
 ## Données externes
 
@@ -76,6 +79,6 @@ Le workflow `.github/workflows/deploy.yml` lint, teste, télécharge les donnée
 
 ## Stack
 
-Vite, React 19, TypeScript, Tailwind 4, shadcn/ui (Base UI), MapLibre GL, Zustand, React Router, vite-plugin-pwa (Workbox), Vitest.
+Vite, React 19, TypeScript, Tailwind 4, shadcn/ui (Base UI), MapLibre GL, Zustand, React Router, vite-plugin-pwa (Workbox), Vitest, supabase-js.
 
 Architecture et décisions : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

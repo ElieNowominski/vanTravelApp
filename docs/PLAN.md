@@ -7,15 +7,16 @@ Document de reprise pour une session Claude Code (ou humaine). Lire d'abord `CLA
 | Dépôt | Chemin local | Rôle | Visibilité |
 | --- | --- | --- | --- |
 | `vanTravelApp` | `C:\Users\enowo\Documents\Projects\vanTravelApp` | Application Vite + React, GitHub Pages, ce plan | public |
-| `vanTravel` | `C:\Users\enowo\Documents\Projects\vanTravel` | Données perso (`trips/`), ancienne app Next.js en archive | privé |
+| `vanTravel` | `C:\Users\enowo\Documents\Projects\vanTravel` | Archive : ancien stockage des données (`trips/`, phases 5 et 6), ancienne app Next.js. Source de la migration vers Supabase | privé |
+| Projet Supabase | tableau de bord | Comptes, données de voyage, documents (phase 7) | compte par personne |
 
-Une session travaille dans `vanTravelApp`. Elle lit et écrit `../vanTravel/trips/` pour les données de test ; en dev, Vite sert ce dossier sous `/__private/`. Rien de `vanTravel` ne doit être copié dans `vanTravelApp` (voir `.cursor/rules/donnees-perso-et-securite.mdc`).
+Une session travaille dans `vanTravelApp`, avec un `.env.local` (URL et clé publiable Supabase, voir `.env.example`). Rien de `vanTravel` ne doit être copié dans `vanTravelApp` (voir `.cursor/rules/donnees-perso-et-securite.mdc`).
 
 Site publié : `https://elienowominski.github.io/vanTravelApp/`. Déploiement automatique à chaque push sur `main`.
 
 Prompt de reprise à coller dans une nouvelle session :
 
-> Lis `CLAUDE.md`, `docs/ARCHITECTURE.md` et `docs/PLAN.md`. Le dépôt privé est dans `../vanTravel`. Reprends à la première étape non cochée de la phase en cours, commite directement sur `main` (personne seule sur le projet, le déploiement suit chaque push) et mets à jour l'état du plan en fin de travail.
+> Lis `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/PLAN.md` et `docs/SUPABASE.md`. Reprends à la première étape non cochée de la phase en cours. Tant que la phase 7 n'est pas validée à deux téléphones, le travail se fait sur la branche `supabase` ; ensuite, commits directement sur `main` (personne seule sur le projet, le déploiement suit chaque push). Mets à jour l'état du plan et le journal en fin de travail.
 
 ## État
 
@@ -26,13 +27,14 @@ Prompt de reprise à coller dans une nouvelle session :
 - [x] Correctifs iPhone (30 sept. 2026, voir « iPhone » ci-dessous) : à **confirmer sur l'iPhone** (Safari puis app installée) car aucun WebKit n'est disponible en session.
 - [x] Phase 5 : synchronisation entre appareils (30 sept. 2026 : code livré et testé unitairement ; **reste à faire par la personne** : créer un token à portée fine par téléphone, ajouter la compagne comme collaboratrice du dépôt privé, valider à deux téléphones, voir « Mise en service » ci-dessous).
 - [~] Phase 6 : socle multi-voyage, Google (30 sept. 2026 : mode sombre fait, sélecteur couvert par la synchro et la bibliothèque ; Google bloqué sans clé ; découpage de `trip-map.tsx` à faire)
-- [ ] Phase 7 : Supabase à la place du dépôt GitHub privé (comptes Google et e-mail, Postgres avec règles par ligne, Storage pour les documents). Plan complet, schéma SQL et étapes côté tableau de bord : `docs/SUPABASE.md` (8 oct. 2026). Branche `supabase`, fusion après validation à deux téléphones, objectif fin novembre 2026.
+- [~] Phase 7 : Supabase à la place du dépôt GitHub privé (comptes Google et e-mail, Postgres avec règles par ligne, Storage pour les documents). Plan, schéma et étapes : `docs/SUPABASE.md`. **8 oct. 2026 : lots A à G livrés sur la branche `supabase`** (client et session, adaptateur et moteur, voyages et membres, documents, script de migration, déploiement et veille, script de contrôle RLS ; lint, typecheck, 94 tests, build verts). **Reste à faire par la personne** : exécuter `supabase/migrations/0002_functions_and_keys.sql`, activer Google, créer les comptes, valider à deux appareils, lancer `scripts/rls-check.mjs` ; voir « Mise en service (phase 7) ». Fusion dans `main` après validation, objectif fin novembre 2026.
 
-Fait savoir : les données sont stockées **par navigateur et par appareil** (IndexedDB), y compris les photos et PDF (base `vantravel-docs`, embarqués dans la sauvegarde v3). Le pont entre appareils est la synchro (dépôt privé) ; le fichier de sauvegarde reste le plan B.
+Fait savoir : les données sont stockées **par navigateur et par appareil** (IndexedDB), y compris les photos et PDF (base `vantravel-docs`, embarqués dans la sauvegarde v3). Le pont entre appareils est la synchro (compte Supabase) ; le fichier de sauvegarde reste le plan B.
 
 ## Conventions de travail
 
-- Commits directement sur `main`, hotfix compris : une seule personne travaille sur le projet et chaque push déploie. Pas de branche ni de PR sauf demande explicite (les phases 3 et 4 ont été livrées par PR, avant cette décision du 29 sept. 2026).
+- Commits directement sur `main`, hotfix compris : une seule personne travaille sur le projet et chaque push déploie. Pas de branche ni de PR sauf demande explicite (les phases 3 et 4 ont été livrées par PR, avant cette décision du 29 sept. 2026 ; la phase 7 vit sur la branche `supabase` jusqu'à validation, `main` continuant de déployer la version GitHub).
+- Tester la branche sans la déployer : `npm run dev` avec `.env.local`, deux profils Chrome = deux comptes ; depuis un téléphone sur le même Wi-Fi, `http://<ip-du-pc>:43217/` (connexion par e-mail ; pas de service worker en HTTP, le reste est identique). `workflow_dispatch` de `deploy.yml` depuis la branche remplacerait le site publié : à réserver au basculement.
 - Avant de livrer : `npm run lint && npm run typecheck && npm test && npm run build`, puis test manuel à 390 px et réseau coupé pour tout ce qui touche au mode Voyager. Libérer le port 43217.
 - Toute nouvelle forme de donnée stockée : bump de `schemaVersion`, migration dans `src/lib`, test Vitest.
 - Logique dans `src/lib` (pure) et `src/services` (réseau) ; composants sans calcul.
@@ -118,6 +120,27 @@ Critère : une réservation saisie sur un téléphone apparaît sur l'autre apr�
 4. Optionnel : même phrase de chiffrement sur les deux téléphones.
 5. Test croisé : une réservation sur un téléphone, réseau coupé sur l'autre, saisie d'une dépense, retour du réseau : les deux voient tout.
 
+## Phase 7 : Supabase (8 oct. 2026, branche `supabase`)
+
+Détail des lots et des décisions : `docs/SUPABASE.md`. Code livré : `src/services/supabase.ts`, `auth.ts`, `supabase-sync.ts`, `sync.ts` réécrit, `src/lib/sync-rows.ts` (testé), `src/store/account-store.ts`, `src/components/account/`, `supabase/schema.sql` et `migrations/0002`, `scripts/migrate-from-private-repo.mjs`, `scripts/rls-check.mjs`, `keepalive.yml`, variables dans `deploy.yml`. Retirés : `github-repo.ts`, `trip-source.ts`, `sync-store.ts`, `sync-dialog.tsx`, plugin Vite `/__private/`.
+
+- [x] Lot A : client, session (Google, e-mail avec confirmation, mot de passe oublié), store de compte, dialogue « Compte et synchro ».
+- [x] Lot B : adaptateur et moteur (lignes, upserts « si plus récent », verrou optimiste, chiffrement conservé). Écart au plan : pas de lecture incrémentale `since`, tout est relu à chaque passe (quelques centaines de lignes) et comparé localement, plus simple et exact.
+- [x] Lot C : voyages (`create_trip`, « Mettre « nom » sur le compte »), membres (ajout par e-mail, retrait par le propriétaire), démarrage sans dépôt privé.
+- [x] Lot D : documents dans le bucket (`<voyage>/<docId>.<ext>`), retrait à la suppression.
+- [x] Lot E : `scripts/migrate-from-private-repo.mjs`. Écart au plan : connexion e-mail et mot de passe du propriétaire au lieu de la clé secrète (mêmes règles RLS que l'app, aucun secret à manipuler). Alternative sans script : « Mettre sur le compte » depuis le PC qui a tout en local.
+- [x] Lot F : `deploy.yml` (variables), `keepalive.yml` (tous les deux jours), docs et règles réécrites.
+- [x] Lot G : `scripts/rls-check.mjs` (deux comptes de test, tables, bucket, verrou optimiste, upsert si plus récent). **À lancer par la personne** après la migration 0002.
+
+### Mise en service (phase 7, à faire par la personne)
+
+1. Supabase, SQL Editor : exécuter `supabase/migrations/0002_functions_and_keys.sql` (clés composées, `upsert_expenses`, `upsert_deletions`, `create_trip`, trigger profils, policies de suppression). Relançable.
+2. Authentication > Providers > Google : activer, Client ID et Secret depuis Google Cloud (origines `https://elienowominski.github.io` et `http://127.0.0.1:43217`, URI de redirection = callback affiché par Supabase). URL Configuration : Site URL `https://elienowominski.github.io/vanTravelApp/`, Redirect URLs idem + `http://127.0.0.1:43217/` (+ `http://<ip-du-pc>:43217/` pour tester Google depuis le téléphone). Sans Google, l'e-mail suffit.
+3. Deux comptes de test e-mail (ex. `rls-a@…`, `rls-b@…`, confirmés), puis `RLS_A_EMAIL=… RLS_A_PASSWORD=… RLS_B_EMAIL=… RLS_B_PASSWORD=… node scripts/rls-check.mjs`. Tout doit passer avant d'ouvrir à un tiers.
+4. Sur le PC (branche `supabase`, `npm run dev`) : se connecter, « Mettre « #FINAL » sur le compte » (ou `node scripts/migrate-from-private-repo.mjs` avec `SUPABASE_EMAIL` et `SUPABASE_PASSWORD`), vérifier la liste des voyages et l'itinéraire.
+5. Ajouter la compagne par e-mail (elle crée d'abord son compte dans l'app). Sur chaque téléphone : se connecter, « Utiliser » le voyage, « Recevoir l'itinéraire du compte ».
+6. Test croisé une semaine : réservation sur l'un, visible sur l'autre ; réseau coupé puis rétabli ; photo ; dépense simultanée ; suppression qui ne ressuscite pas. Puis fusion dans `main`, déploiement, archivage de `vanTravel`.
+
 ## Phase 6 : socle multi-voyage et Google (quand le besoin vient)
 
 - [~] Sélecteur de voyage : couvert côté dépôt privé par « Compte et synchro » (liste de `trips/index.json`, bouton « Utiliser ») et côté local par la bibliothèque. Reste : formulaire de création avec choix de région et de véhicule (une seule région aujourd'hui, `nz-south` ; nouvelle région = un fichier dans `src/data/regions/` et un catalogue dans `src/data/catalog/`, plus `buildCatalog` à paramétrer par région).
@@ -128,5 +151,5 @@ Critère : une réservation saisie sur un téléphone apparaît sur l'autre apr�
 ## Idées écartées ou différées, avec la raison
 
 - Préchargement de tuiles OSM : interdit par la politique d'usage OSM. Alternative future : extrait PMTiles auto-hébergé, à évaluer (taille, requêtes Range sur Pages).
-- Base de données gratuite (Supabase, Firebase) : compte tiers, pause après inactivité, données perso hors de contrôle.
+- Base de données gratuite : écartée le 29 sept. (compte tiers, pause après inactivité), reprise le 7 oct. avec Supabase quand les documents chez GitHub et l'ouverture à des tiers sont devenus des besoins ; la pause est traitée par `keepalive.yml`.
 - Gist comme stockage : pas de binaire propre pour les documents.
