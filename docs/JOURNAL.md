@@ -57,3 +57,12 @@ Les entrées antérieures au 7 octobre 2026 sont reconstituées après coup depu
   - Risque Supabase identifié : pause après une semaine sans requêtes ; à traiter par un cron ou par le plan Pro le mois du voyage.
   - Stack cible retenue pour la suite : front inchangé, Supabase (Auth, Postgres avec règles par ligne, Storage), dépôt de données retiré ; hébergement GitHub Pages conservé pour février (la clé publique Supabase est faite pour le navigateur, aucun secret dans le front), Cloudflare Pages seulement si le dépôt passe en privé ou s'il faut masquer l'app.
 - **Chiffres** : 2 commits dans `vanTravelApp`, 4 commits manuels et 9 commits de synchro dans `vanTravel`, 94 tests, environ 2 h 30 de session.
+
+## 2026-10-08 : plan d'intégration Supabase
+
+- **Intention** : disposer d'un plan complet, utilisable comme entrée d'une nouvelle session, pour remplacer le dépôt GitHub privé par Supabase sans toucher au front ni au mode hors ligne.
+- **Demandes** : « génère-moi un plan avec les étapes à faire de mon côté via Supabase et les étapes dans le code » ; la veille : « Supabase + GitHub Pages marcherait, pour éviter Cloudflare ? », « si j'ai Supabase, je pourrais aussi tout mettre sur mon GitHub privé ? ».
+- **Livré** : `docs/SUPABASE.md` : cible, règles d'or (hors ligne d'abord, une ligne par entité, itinéraire en un document, serveur qui tranche par `updated_at`, règles d'accès dans Postgres), schéma SQL complet avec RLS et policies Storage, huit étapes côté tableau de bord Supabase, Google Cloud et GitHub, sept lots de code estimés (A client et session, B adaptateur de synchro, C voyages et membres, D documents, E migration, F déploiement et nettoyage, G contrôle des règles d'accès), tableau des risques, prompt de reprise. Phase 7 ajoutée à `PLAN.md`.
+- **Cassé ou appris** : rien de cassé. Clarifications utiles pour la suite : il n'y a pas de secret dans un front statique, la clé publiable Supabase est faite pour le navigateur et la sécurité repose sur les règles par ligne ; GitHub Pages depuis un dépôt privé exige un plan payant et le site reste public de toute façon ; Supabase n'héberge pas de frontend.
+- **Décisions** : GitHub Pages conservé pour février (pas de réinstallation de la PWA, pas de service de plus), Cloudflare Pages reporté au passage éventuel en dépôt privé ; branche `supabase` le temps du chantier, écart explicite à la règle 10 ; dépôt de données `vanTravel` archivé après migration ; Pro à 25 $ envisagé pour le seul mois du voyage.
+- **Chiffres** : 1 commit, environ 45 min.

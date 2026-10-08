@@ -26,6 +26,7 @@ Prompt de reprise à coller dans une nouvelle session :
 - [x] Correctifs iPhone (30 sept. 2026, voir « iPhone » ci-dessous) : à **confirmer sur l'iPhone** (Safari puis app installée) car aucun WebKit n'est disponible en session.
 - [x] Phase 5 : synchronisation entre appareils (30 sept. 2026 : code livré et testé unitairement ; **reste à faire par la personne** : créer un token à portée fine par téléphone, ajouter la compagne comme collaboratrice du dépôt privé, valider à deux téléphones, voir « Mise en service » ci-dessous).
 - [~] Phase 6 : socle multi-voyage, Google (30 sept. 2026 : mode sombre fait, sélecteur couvert par la synchro et la bibliothèque ; Google bloqué sans clé ; découpage de `trip-map.tsx` à faire)
+- [ ] Phase 7 : Supabase à la place du dépôt GitHub privé (comptes Google et e-mail, Postgres avec règles par ligne, Storage pour les documents). Plan complet, schéma SQL et étapes côté tableau de bord : `docs/SUPABASE.md` (8 oct. 2026). Branche `supabase`, fusion après validation à deux téléphones, objectif fin novembre 2026.
 
 Fait savoir : les données sont stockées **par navigateur et par appareil** (IndexedDB), y compris les photos et PDF (base `vantravel-docs`, embarqués dans la sauvegarde v3). Le pont entre appareils est la synchro (dépôt privé) ; le fichier de sauvegarde reste le plan B.
 
