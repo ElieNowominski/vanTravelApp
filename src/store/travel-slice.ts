@@ -13,12 +13,19 @@ export type TravelSlice = {
   /** Choix explicite Planifier / Voyager ; `null` = mode par défaut (dates du voyage, itinéraire figé). */
   uiMode: AppMode | null;
   setUiMode: (mode: AppMode | null) => void;
+  /** Jour affiché sur l'écran Jour ; `null` = aujourd'hui. Pas persisté : survit à la navigation, pas au rechargement. */
+  travelDay: number | null;
+  setTravelDay: (index: number | null) => void;
   setStopNotes: (stopId: string, notes: string) => void;
   upsertBooking: (stopId: string, input: BookingInput, bookingId?: string) => string;
   removeBooking: (stopId: string, bookingId: string) => void;
   addDocument: (stopId: string, input: DocumentInput) => string;
   updateDocumentCaption: (stopId: string, documentId: string, caption: string) => void;
   removeDocument: (stopId: string, documentId: string) => void;
+  /** Documents du voyage, hors étape. */
+  addTripDocument: (input: DocumentInput) => string;
+  updateTripDocumentCaption: (documentId: string, caption: string) => void;
+  removeTripDocument: (documentId: string) => void;
   addChecklistItem: (stopId: string, text: string) => void;
   toggleChecklistItem: (stopId: string, itemId: string) => void;
   removeChecklistItem: (stopId: string, itemId: string) => void;
@@ -65,6 +72,8 @@ export function createTravelSlice(set: Set): TravelSlice {
   return {
     uiMode: null,
     setUiMode: (mode) => set(() => ({ uiMode: mode })),
+    travelDay: null,
+    setTravelDay: (index) => set(() => ({ travelDay: index })),
 
     setStopNotes: (stopId, notes) =>
       patchStop(set, stopId, (stop) =>
@@ -132,6 +141,25 @@ export function createTravelSlice(set: Set): TravelSlice {
         };
       }),
 
+    addTripDocument: (input) => {
+      const id = input.id ?? newId("doc");
+      const { scope: _scope, ...rest } = input;
+      void _scope;
+      set((prev) => ({ tripDocuments: [...prev.tripDocuments, { ...rest, id, ...stamp(), caption: clean(input.caption) }] }));
+      return id;
+    },
+
+    updateTripDocumentCaption: (documentId, caption) =>
+      set((prev) => ({
+        tripDocuments: prev.tripDocuments.map((d) => (d.id === documentId ? { ...d, caption: clean(caption), ...stamp() } : d)),
+      })),
+
+    removeTripDocument: (documentId) =>
+      set((prev) => ({
+        tripDocuments: prev.tripDocuments.filter((d) => d.id !== documentId),
+        tombstones: bury(prev, documentId),
+      })),
+
     addChecklistItem: (stopId, text) => {
       const trimmed = text.trim();
       if (!trimmed) return;
@@ -173,7 +201,15 @@ export function createTravelSlice(set: Set): TravelSlice {
         ...day,
         expenses: [
           ...(day.expenses ?? []),
-          { id, ...stamp(), ...input, date: input.date || day.date, paidBy: input.paidBy.trim(), note: clean(input.note) },
+          {
+            id,
+            ...stamp(),
+            ...input,
+            date: input.date || day.date,
+            paidBy: input.paidBy.trim(),
+            note: clean(input.note),
+            ...(clean(input.stopId) ? { stopId: clean(input.stopId) } : {}),
+          },
         ],
       }));
       return id;

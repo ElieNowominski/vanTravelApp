@@ -136,3 +136,32 @@ describe("normalisation des entités", () => {
     expect(out).toEqual([expect.objectContaining({ text: "Plein", done: true })]);
   });
 });
+
+describe("v4 : portée des documents, étape des dépenses, documents de voyage", () => {
+  const base = { id: "d", updatedAt: "2026-10-01T00:00:00.000Z", updatedBy: "A", kind: "pdf", path: "", size: 1, mimeType: "application/pdf" };
+
+  it("pose « nuit » sur les documents d'une étape de nuit, « activite » ailleurs, et garde une portée explicite", () => {
+    const out = migrateSnapshot({
+      ...v1,
+      stops: {
+        s1: { ...v1.stops.s1, documents: [{ ...base, id: "d1" }] },
+        s2: { ...v1.stops.s2, documents: [{ ...base, id: "d2" }, { ...base, id: "d3", scope: "activite" }, { ...base, id: "d4", scope: "nimporte" }] },
+      },
+    } as unknown as Partial<TripSnapshot>);
+    expect(out.stops.s1.documents.map((d) => d.scope)).toEqual(["activite"]);
+    expect(out.stops.s2.documents.map((d) => d.scope)).toEqual(["nuit", "activite", "nuit"]);
+  });
+
+  it("garde le stopId d'une dépense et crée tripDocuments vide, sans portée sur un document de voyage", () => {
+    const out = migrateSnapshot(v1 as unknown as Partial<TripSnapshot>);
+    expect(out.tripDocuments).toEqual([]);
+    const withDocs = migrateSnapshot({
+      ...v1,
+      tripDocuments: [{ ...base, id: "t1" }, { nope: true }],
+      days: [{ ...v1.days[0], expenses: [{ id: "e1", amount: 5, stopId: "s2" }, { id: "e2", amount: 6, stopId: "" }] }],
+    } as unknown as Partial<TripSnapshot>);
+    expect(withDocs.tripDocuments?.map((d) => [d.id, d.scope])).toEqual([["t1", undefined]]);
+    expect(withDocs.days[0].expenses.map((e) => e.stopId)).toEqual(["s2", undefined]);
+    expect(normalizeExpenses([{ amount: 1, stopId: "x" }])[0].stopId).toBe("x");
+  });
+});

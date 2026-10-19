@@ -39,6 +39,9 @@ create table if not exists public.itineraries (
 );
 
 -- Entités de voyage : une ligne par réservation, document, coche, note d'étape, note ou météo de jour.
+-- `scope` : identifiant d'étape ou date AAAA-MM-JJ ; un document de voyage (hors étape, schéma v4 du client)
+-- porte le scope réservé 'trip'. Le payload d'un document d'étape porte `scope` ('nuit' ou 'activite'),
+-- celui d'une dépense un `stopId` optionnel : aucune colonne à ajouter.
 create table if not exists public.travel_items (
   id text not null,
   trip_id text not null references public.trips (id) on delete cascade,

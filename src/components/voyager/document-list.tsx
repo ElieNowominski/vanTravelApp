@@ -10,17 +10,28 @@ import { formatBytes } from "@/lib/freeze";
 import { newId } from "@/lib/geo";
 import { extensionFor, prepareDocument } from "@/lib/image-compress";
 import type { TripDocument } from "@/lib/types";
+import type { DocumentInput } from "@/store/travel-slice";
 import { useTripStore } from "@/store/trip-store";
 
 /**
- * Photos et PDF d'une étape : compressés côté client (~300 Ko), stockés dans IndexedDB.
- * Le chemin `trips/<voyage>/docs/<id>.<ext>` est réservé pour la synchro (phase 5).
+ * Liste gérable de documents (photo ou PDF) : ajout par l'appareil photo ou un fichier, légende, suppression.
+ * Le contenu est compressé côté client (~300 Ko) et vit dans IndexedDB ; l'entité ne porte que les
+ * métadonnées. Qui possède la liste (une étape, le voyage) est l'affaire de l'appelant.
  */
-export function DocumentsSection({ stopId, documents }: { stopId: string; documents: TripDocument[] }) {
+export function DocumentList({
+  documents,
+  onAdd,
+  onCaption,
+  onRemove,
+  emptyText,
+}: {
+  documents: TripDocument[];
+  onAdd: (input: DocumentInput) => void;
+  onCaption: (documentId: string, caption: string) => void;
+  onRemove: (documentId: string) => void;
+  emptyText?: string;
+}) {
   const tripId = useTripStore((s) => s.config?.id ?? "voyage");
-  const addDocument = useTripStore((s) => s.addDocument);
-  const removeDocument = useTripStore((s) => s.removeDocument);
-  const updateCaption = useTripStore((s) => s.updateDocumentCaption);
   const cameraRef = useRef<HTMLInputElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const [busy, setBusy] = useState(false);
@@ -33,7 +44,7 @@ export function DocumentsSection({ stopId, documents }: { stopId: string; docume
       const { blob, kind } = await prepareDocument(file);
       const id = newId("doc");
       await putDocumentBlob(id, blob);
-      addDocument(stopId, {
+      onAdd({
         id,
         kind,
         caption: file.name.replace(/\.[a-z0-9]+$/i, ""),
@@ -62,7 +73,21 @@ export function DocumentsSection({ stopId, documents }: { stopId: string; docume
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
+      {documents.length === 0 && !busy && emptyText && <p className="text-sm text-muted-foreground">{emptyText}</p>}
+      <ul className="flex flex-col gap-2">
+        {documents.map((doc) => (
+          <DocumentRow
+            key={doc.id}
+            doc={doc}
+            onCaption={(caption) => onCaption(doc.id, caption)}
+            onRemove={async () => {
+              onRemove(doc.id);
+              await deleteDocumentBlob(doc.id);
+            }}
+          />
+        ))}
+      </ul>
       <div className="flex gap-2">
         <Button variant="outline" className="h-11 flex-1" disabled={busy} onClick={() => cameraRef.current?.click()}>
           <Camera className="size-4" />
@@ -77,26 +102,6 @@ export function DocumentsSection({ stopId, documents }: { stopId: string; docume
       </div>
       {busy && <p className="text-xs text-muted-foreground">Compression en cours…</p>}
       {status && <p className="text-xs text-muted-foreground">{status}</p>}
-
-      {documents.length === 0 && !busy && (
-        <p className="text-sm text-muted-foreground">
-          Confirmation de réservation, ticket, plan du camping : tout reste sur le téléphone, lisible sans réseau.
-        </p>
-      )}
-
-      <ul className="flex flex-col gap-2">
-        {documents.map((doc) => (
-          <DocumentRow
-            key={doc.id}
-            doc={doc}
-            onCaption={(caption) => updateCaption(stopId, doc.id, caption)}
-            onRemove={async () => {
-              removeDocument(stopId, doc.id);
-              await deleteDocumentBlob(doc.id);
-            }}
-          />
-        ))}
-      </ul>
     </div>
   );
 }
@@ -150,4 +155,52 @@ function DocumentRow({ doc, onCaption, onRemove }: { doc: TripDocument; onCaptio
       </div>
     </li>
   );
+}
+
+/** Vignettes en lecture seule (page Documents) : ouvrir le fichier, rien d'autre. */
+export function DocumentTiles({ documents, badge }: { documents: TripDocument[]; badge?: (doc: TripDocument) => string | null }) {
+  return (
+    <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+      {documents.map((doc) => (
+        <DocumentTile key={doc.id} doc={doc} badge={badge?.(doc) ?? null} />
+      ))}
+    </ul>
+  );
+}
+
+function DocumentTile({ doc, badge }: { doc: TripDocument; badge: string | null }) {
+  const { url, missing } = useDocumentUrl(doc.id);
+  return (
+    <li>
+      <a
+        href={url ?? undefined}
+        target="_blank"
+        rel="noreferrer"
+        className="relative flex aspect-square flex-col items-center justify-center gap-1.5 overflow-hidden rounded-xl bg-card p-1.5 ring-1 ring-foreground/10"
+        aria-label={`${doc.caption || (doc.kind === "pdf" ? "PDF" : "Photo")}${missing ? ", contenu absent sur cet appareil" : ""}`}
+      >
+        {doc.kind === "image" && url ? (
+          <img src={url} alt="" className="absolute inset-0 size-full object-cover" />
+        ) : (
+          <FileText className="size-7 text-muted-foreground" aria-hidden />
+        )}
+        {badge && (
+          <span className="absolute top-1.5 left-1.5 rounded-full bg-background/90 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+            {badge}
+          </span>
+        )}
+        <span
+          className={cnTile(doc.kind === "image" && !!url)}
+        >
+          {doc.caption || (doc.kind === "pdf" ? "PDF" : "Photo")}
+        </span>
+      </a>
+    </li>
+  );
+}
+
+function cnTile(overImage: boolean): string {
+  return overImage
+    ? "absolute inset-x-1.5 bottom-1.5 truncate rounded-md bg-background/90 px-1.5 py-0.5 text-center text-[11px] leading-tight"
+    : "w-full truncate px-1 text-center text-[11px] leading-tight";
 }

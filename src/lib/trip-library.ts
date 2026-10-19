@@ -58,6 +58,7 @@ export function buildSavedTrip(
     currentDayIndex: snapshot.currentDayIndex,
     frozenAt: snapshot.frozenAt ?? null,
     tombstones: { ...(snapshot.tombstones ?? {}) },
+    tripDocuments: structuredClone(snapshot.tripDocuments ?? []),
   };
 }
 

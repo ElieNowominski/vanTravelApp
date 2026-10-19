@@ -26,6 +26,9 @@ export type TravelItemRow = {
   updated_by: string;
 };
 
+/** `scope` d'un document de voyage (hors étape) : aucune étape ne porte cet identifiant. */
+export const TRIP_DOCUMENTS_SCOPE = "trip";
+
 export type ExpenseRow = { id: string; trip_id: string; payload: unknown; updated_at: string; updated_by: string };
 
 export type DeletionRow = { trip_id: string; entity_id: string; deleted_at: string };
@@ -51,6 +54,9 @@ export function travelDocToRows(tripId: string, doc: TravelDoc): TravelItemRow[]
     for (const d of stop.documents) rows.push({ id: d.id, trip_id: tripId, kind: "document", scope: stopId, payload: d, updated_at: d.updatedAt, updated_by: d.updatedBy });
     for (const c of stop.checklist) rows.push({ id: c.id, trip_id: tripId, kind: "checklist", scope: stopId, payload: c, updated_at: c.updatedAt, updated_by: c.updatedBy });
     if (stop.notesAt) stamped(`${stopId}:notes`, "stop_notes", stopId, stop.notes, stop.notesAt);
+  }
+  for (const d of doc.tripDocuments ?? []) {
+    rows.push({ id: d.id, trip_id: tripId, kind: "document", scope: TRIP_DOCUMENTS_SCOPE, payload: d, updated_at: d.updatedAt, updated_by: d.updatedBy });
   }
   for (const [date, day] of Object.entries(doc.days)) {
     if (day.notesAt) stamped(`${date}:notes`, "day_notes", date, day.notes, day.notesAt);
@@ -82,7 +88,8 @@ export function rowsToTravelDoc(rows: TravelItemRow[], tombstones: Record<string
         stop(row.scope).bookings.push(...normalizeBookings([row.payload]));
         break;
       case "document":
-        stop(row.scope).documents.push(...normalizeDocuments([row.payload]));
+        if (row.scope === TRIP_DOCUMENTS_SCOPE) (doc.tripDocuments ??= []).push(...normalizeDocuments([row.payload]));
+        else stop(row.scope).documents.push(...normalizeDocuments([row.payload]));
         break;
       case "checklist":
         stop(row.scope).checklist.push(...normalizeChecklist([row.payload]));

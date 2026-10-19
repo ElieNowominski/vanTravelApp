@@ -52,6 +52,8 @@ export type TravelDoc = {
   /** Par date calendaire AAAA-MM-JJ. */
   days: Record<string, DayTravel>;
   tombstones: Record<string, string>;
+  /** Documents du voyage, hors étape (schéma v4) ; absent dans un document antérieur. */
+  tripDocuments?: TripDocument[];
 };
 
 export type ExpensesDoc = {
@@ -126,7 +128,7 @@ function emptyStopTravel(): StopTravel {
 }
 
 export function emptyTravelDoc(updatedAt = EPOCH): TravelDoc {
-  return { format: SYNC_FORMAT, updatedAt, stops: {}, days: {}, tombstones: {} };
+  return { format: SYNC_FORMAT, updatedAt, stops: {}, days: {}, tombstones: {}, tripDocuments: [] };
 }
 
 export function emptyExpensesDoc(updatedAt = EPOCH): ExpensesDoc {
@@ -143,7 +145,14 @@ export function mergeTravel(a: TravelDoc, b: TravelDoc): TravelDoc {
   for (const date of new Set([...Object.keys(a.days), ...Object.keys(b.days)])) {
     days[date] = mergeDayTravel(a.days[date], b.days[date]);
   }
-  return { format: SYNC_FORMAT, updatedAt: a.updatedAt > b.updatedAt ? a.updatedAt : b.updatedAt, stops, days, tombstones };
+  return {
+    format: SYNC_FORMAT,
+    updatedAt: a.updatedAt > b.updatedAt ? a.updatedAt : b.updatedAt,
+    stops,
+    days,
+    tombstones,
+    tripDocuments: mergeEntities(a.tripDocuments ?? [], b.tripDocuments ?? [], tombstones),
+  };
 }
 
 export function mergeExpenses(a: ExpensesDoc, b: ExpensesDoc): ExpensesDoc {
@@ -175,7 +184,7 @@ export function extractTravel(snapshot: TripSnapshot, updatedAt: string): Travel
     if (!day.notesAt && !day.weatherAt) continue;
     days[day.date] = { notes: day.notes, notesAt: day.notesAt, weather: day.weather, weatherAt: day.weatherAt };
   }
-  return { format: SYNC_FORMAT, updatedAt, stops, days, tombstones: snapshot.tombstones ?? {} };
+  return { format: SYNC_FORMAT, updatedAt, stops, days, tombstones: snapshot.tombstones ?? {}, tripDocuments: snapshot.tripDocuments ?? [] };
 }
 
 export function extractExpenses(snapshot: TripSnapshot, updatedAt: string): ExpensesDoc {
@@ -226,7 +235,13 @@ export function applyTravel(snapshot: TripSnapshot, travel: TravelDoc, expenses:
       expenses: byDate.get(day.date) ?? [],
     };
   });
-  return { ...snapshot, stops, days, tombstones: mergeTombstones(travel.tombstones, expenses.tombstones) };
+  return {
+    ...snapshot,
+    stops,
+    days,
+    tombstones: mergeTombstones(travel.tombstones, expenses.tombstones),
+    tripDocuments: travel.tripDocuments ?? [],
+  };
 }
 
 /** Itinéraire sans les données de voyage : c'est ce que `ItineraryDoc` transporte. */

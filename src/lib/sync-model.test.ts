@@ -205,3 +205,26 @@ describe("itinéraire", () => {
   });
 
 });
+
+describe("documents de voyage (v4)", () => {
+  const tripDoc = (id: string, updatedAt: string, caption = "Assurance") => ({ id, updatedAt, updatedBy: "Élie", kind: "pdf" as const, caption, path: "", size: 1, mimeType: "application/pdf" });
+
+  it("extractTravel les emporte, mergeTravel les fusionne par entité, applyTravel les réinjecte", () => {
+    const snap = { ...snapshot(), tripDocuments: [tripDoc("t1", T0)] };
+    const local = extractTravel(snap, T0);
+    expect(local.tripDocuments?.map((d) => d.id)).toEqual(["t1"]);
+    const remote = emptyTravelDoc(T1);
+    remote.tripDocuments = [tripDoc("t1", T1, "Assurance (à jour)"), tripDoc("t2", T1)];
+    remote.tombstones = { t2: T2 };
+    const merged = mergeTravel(local, remote);
+    expect(merged.tripDocuments?.map((d) => [d.id, d.caption])).toEqual([["t1", "Assurance (à jour)"]]);
+    const out = applyTravel(snap, merged, extractExpenses(snap, T0));
+    expect(out.tripDocuments?.map((d) => d.caption)).toEqual(["Assurance (à jour)"]);
+  });
+
+  it("un document de fusion antérieur à la v4 (sans tripDocuments) se fusionne sans erreur", () => {
+    const old = { ...emptyTravelDoc(T1), tripDocuments: undefined };
+    expect(mergeTravel(extractTravel(snapshot(), T0), old).tripDocuments).toEqual([]);
+    expect(stripTravel({ ...snapshot(), tripDocuments: [tripDoc("t1", T0)] }).tripDocuments).toBeUndefined();
+  });
+});

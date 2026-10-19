@@ -63,9 +63,14 @@ export type Booking = EntityMeta & {
 
 export type DocumentKind = "image" | "pdf";
 
+/** Un document d'étape concerne la nuit (camping, réservation) ou une activité (billets, plan). */
+export type DocumentScope = "nuit" | "activite";
+
 export type TripDocument = EntityMeta & {
   kind: DocumentKind;
   caption?: string;
+  /** Absent sur un document de voyage (passeport, assurance) ; posé à la migration sur ceux d'une étape. */
+  scope?: DocumentScope;
   /**
    * Chemin cible dans le dépôt privé (`trips/<id>/docs/<docId>.<ext>`), rempli à la synchro (phase 5).
    * Le contenu vit localement dans IndexedDB (`src/lib/document-store.ts`), jamais dans le brouillon JSON.
@@ -91,6 +96,8 @@ export type Expense = EntityMeta & {
   /** Prénom de la personne qui a payé. */
   paidBy: string;
   note?: string;
+  /** Étape à laquelle la dépense se rattache ; absente, elle reste au jour. */
+  stopId?: string;
 };
 
 export type Stop = PlaceInput & {
@@ -167,6 +174,8 @@ export type TripSnapshot = {
    * Sans elles, la synchro ferait renaître l'entité depuis l'autre appareil.
    */
   tombstones?: Record<string, string>;
+  /** Documents du voyage, hors étape (passeport, assurance, contrat du van). Schéma v4. */
+  tripDocuments?: TripDocument[];
 };
 
 export type TripMarkKind = "plus" | "minus";

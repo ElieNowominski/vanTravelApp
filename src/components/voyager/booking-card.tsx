@@ -39,12 +39,6 @@ export function BookingCard({
         )}
       </header>
 
-      {booking.accessCode ? (
-        <SecretField label="Code d’accès" value={booking.accessCode} />
-      ) : booking.accessCodeSecure ? (
-        <LockedSecret label="Code d’accès" />
-      ) : null}
-
       {(booking.checkIn || booking.checkOut) && (
         <p className="text-xs text-muted-foreground">
           {booking.checkIn ? `Arrivée ${booking.checkIn}` : ""}
@@ -52,7 +46,13 @@ export function BookingCard({
           {booking.checkOut ? `Départ ${booking.checkOut}` : ""}
         </p>
       )}
-      {booking.address && <p className="text-sm">{booking.address}</p>}
+      {(booking.address || booking.accessCode) && (
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+          {booking.address && <p className="text-sm">{booking.address}</p>}
+          {booking.accessCode && <SecretField label="Code d’accès" value={booking.accessCode} compact />}
+        </div>
+      )}
+      {!booking.accessCode && booking.accessCodeSecure && <LockedSecret label="Code d’accès" />}
       {!compact && booking.notes && <p className="text-sm whitespace-pre-line text-muted-foreground">{booking.notes}</p>}
 
       <div className="flex flex-wrap gap-2">

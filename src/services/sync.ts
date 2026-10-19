@@ -177,6 +177,7 @@ async function pass(reason: string, options: SyncOptions): Promise<string> {
       frozenAt: snapshot.frozenAt ?? null,
       marks,
       tombstones,
+      tripDocuments: snapshot.tripDocuments ?? [],
       ...(decision === "take-remote" && config ? { activeSavedName: config.name } : {}),
     }),
   );
@@ -303,26 +304,25 @@ async function syncDocuments(tripId: string, travel: TravelDoc, tombstones: Reco
   let uploaded = 0;
   let downloaded = 0;
   let failed = 0;
-  for (const stop of Object.values(travel.stops)) {
-    for (const doc of stop.documents) {
-      const path = storageObjectPath(tripId, doc);
-      const key = `doc:${doc.id}`;
-      try {
-        const local = await getDocumentBlob(doc.id);
-        if (local && !seen[key]) {
-          if ((await uploadDocument(path, local, doc.mimeType)) === "uploaded") uploaded++;
+  const allDocuments = [...Object.values(travel.stops).flatMap((stop) => stop.documents), ...(travel.tripDocuments ?? [])];
+  for (const doc of allDocuments) {
+    const path = storageObjectPath(tripId, doc);
+    const key = `doc:${doc.id}`;
+    try {
+      const local = await getDocumentBlob(doc.id);
+      if (local && !seen[key]) {
+        if ((await uploadDocument(path, local, doc.mimeType)) === "uploaded") uploaded++;
+        seen[key] = path;
+      } else if (!local) {
+        const remote = await downloadDocument(path);
+        if (remote) {
+          await putDocumentBlob(doc.id, new Blob([remote], { type: doc.mimeType }));
           seen[key] = path;
-        } else if (!local) {
-          const remote = await downloadDocument(path);
-          if (remote) {
-            await putDocumentBlob(doc.id, new Blob([remote], { type: doc.mimeType }));
-            seen[key] = path;
-            downloaded++;
-          }
+          downloaded++;
         }
-      } catch {
-        failed++;
       }
+    } catch {
+      failed++;
     }
   }
   // Documents supprimés : le fichier quitte le bucket et cet appareil, une fois.

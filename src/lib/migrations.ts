@@ -3,6 +3,7 @@ import { normalizeActivities } from "@/lib/stop-activities";
 import type {
   Booking,
   ChecklistItem,
+  DocumentScope,
   EntityMeta,
   Expense,
   ExpenseCategory,
@@ -20,10 +21,12 @@ import type {
  *     snapshot += `frozenAt`. Chaque entité porte `id`, `updatedAt`, `updatedBy`.
  * 3 : synchronisation. Snapshot += `tombstones` (id -> date de suppression) ; étape += `notesAt` ;
  *     jour += `notesAt`, `weatherAt` ; réservation += `accessCodeSecure` (code chiffré).
+ * 4 : navigation Voyager. Document d'étape += `scope` (« nuit » si l'étape est une nuit, sinon « activite »,
+ *     quand il manque) ; dépense += `stopId` (optionnel) ; snapshot += `tripDocuments` (documents hors étape).
  *
  * La migration est idempotente : on peut la passer sur des données déjà à jour.
  */
-export const SNAPSHOT_SCHEMA_VERSION = 3;
+export const SNAPSHOT_SCHEMA_VERSION = 4;
 
 export const EXPENSE_CATEGORY_IDS: ExpenseCategory[] = [
   "carburant",
@@ -85,17 +88,27 @@ export function normalizeBookings(value: unknown): Booking[] {
   });
 }
 
-export function normalizeDocuments(value: unknown): TripDocument[] {
+function documentScope(value: unknown): DocumentScope | undefined {
+  return value === "nuit" || value === "activite" ? value : undefined;
+}
+
+/**
+ * `defaultScope` : portée posée quand elle manque (document d'étape antérieur à la v4). Sans elle, la
+ * portée reste absente (document de voyage, ou ligne de synchro lue sans son étape : `migrateStop` complète).
+ */
+export function normalizeDocuments(value: unknown, defaultScope?: DocumentScope): TripDocument[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item): TripDocument[] => {
     if (!isRecord(item)) return [];
     const kind = item.kind === "pdf" ? "pdf" : item.kind === "image" ? "image" : null;
     if (!kind) return [];
+    const scope = documentScope(item.scope) ?? defaultScope;
     return [
       {
         ...normalizeMeta(item, "doc"),
         kind,
         caption: str(item.caption),
+        ...(scope ? { scope } : {}),
         path: str(item.path) ?? "",
         size: num(item.size) ?? 0,
         mimeType: str(item.mimeType) ?? (kind === "pdf" ? "application/pdf" : "image/jpeg"),
@@ -132,6 +145,7 @@ export function normalizeExpenses(value: unknown, fallbackDate = ""): Expense[] 
         category,
         paidBy: str(item.paidBy) ?? "",
         note: str(item.note),
+        ...(str(item.stopId) ? { stopId: str(item.stopId) } : {}),
       },
     ];
   });
@@ -143,7 +157,7 @@ export function migrateStop(stop: Partial<Stop> & Record<string, unknown>): Stop
     ...(stop as Stop),
     activities: normalizeActivities(stop.activities),
     bookings: normalizeBookings(stop.bookings),
-    documents: normalizeDocuments(stop.documents),
+    documents: normalizeDocuments(stop.documents, stop.isOvernight ? "nuit" : "activite"),
     checklist: normalizeChecklist(stop.checklist),
     notesAt: str(stop.notesAt),
   };
@@ -206,5 +220,6 @@ export function migrateSnapshot<T extends Partial<TripSnapshot>>(raw: T): T & Tr
     currentDayIndex: typeof raw.currentDayIndex === "number" ? raw.currentDayIndex : 0,
     frozenAt: typeof raw.frozenAt === "string" ? raw.frozenAt : null,
     tombstones: normalizeTombstones(raw.tombstones),
+    tripDocuments: normalizeDocuments(raw.tripDocuments),
   };
 }

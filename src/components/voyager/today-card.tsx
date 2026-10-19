@@ -1,6 +1,7 @@
-import { ArrowRight, CloudSun, MapPin, Moon, Phone } from "lucide-react";
+import { Link } from "react-router";
+import { ArrowRight, ChevronRight, CloudSun, MapPin, Moon, Phone } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DirectionsButtons } from "@/components/voyager/directions-buttons";
@@ -14,19 +15,9 @@ import { useTripStore } from "@/store/trip-store";
 
 /**
  * « Aujourd'hui » : ce qu'il faut savoir en trois touches. Prochaine étape, route,
- * nuit du soir avec référence et code, Google Maps et téléphone.
+ * nuit du soir avec référence et code, Google Maps et téléphone. La fiche de l'étape est une page (`/etape/:id`).
  */
-export function TodayCard({
-  summary,
-  isToday,
-  vehicle,
-  onOpenStop,
-}: {
-  summary: DaySummary;
-  isToday: boolean;
-  vehicle: Vehicle;
-  onOpenStop: (stopId: string) => void;
-}) {
+export function TodayCard({ summary, isToday, vehicle }: { summary: DaySummary; isToday: boolean; vehicle: Vehicle }) {
   const setDayWeather = useTripStore((s) => s.setDayWeather);
   const setDayNotes = useTripStore((s) => s.setDayNotes);
   const weather = useDraftField(summary.day.weather ?? "", (next) => setDayWeather(summary.dayIndex, next));
@@ -79,34 +70,41 @@ export function TodayCard({
       </section>
 
       <section className="rounded-xl bg-primary/5 p-3 ring-1 ring-primary/20">
-        <div className="flex items-center gap-2">
-          <Moon className="size-4 text-primary" aria-hidden />
-          <p className="text-xs font-medium text-primary">Nuit du soir</p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="flex items-center gap-2 text-xs font-medium text-primary">
+            <Moon className="size-4" aria-hidden />
+            Nuit du soir
+          </p>
+          {overnight && (
+            <Link to={`/etape/${overnight.id}`} className="inline-flex min-h-11 items-center gap-0.5 text-sm font-medium text-primary">
+              Fiche de l’étape
+              <ChevronRight className="size-4" aria-hidden />
+            </Link>
+          )}
         </div>
         {overnight ? (
           <>
-            <button type="button" className="mt-1 block w-full text-left" onClick={() => onOpenStop(overnight.id)}>
+            <Link to={`/etape/${overnight.id}`} className="mt-1 block">
               <p className="text-lg leading-tight font-semibold">{overnight.name}</p>
               {overnight.area && <p className="text-sm text-muted-foreground">{overnight.area}</p>}
-            </button>
+            </Link>
             {tonightBooking ? (
-              <div className="mt-2 flex flex-col gap-2">
-                <p className="text-sm">
-                  {tonightBooking.provider !== overnight.name ? `${tonightBooking.provider} · ` : ""}
-                  {tonightBooking.reference ? (
-                    <>
-                      <span className="text-muted-foreground">Réf. </span>
-                      <span className="font-mono font-medium select-all">{tonightBooking.reference}</span>
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">sans référence</span>
-                  )}
-                </p>
-                {tonightBooking.accessCode ? (
-                  <SecretField label="Code d’accès" value={tonightBooking.accessCode} />
-                ) : tonightBooking.accessCodeSecure ? (
-                  <LockedSecret label="Code d’accès" />
-                ) : null}
+              <div className="mt-2 flex flex-col gap-1">
+                <div className="flex flex-wrap items-center justify-between gap-x-3">
+                  <p className="text-sm">
+                    {tonightBooking.provider !== overnight.name ? `${tonightBooking.provider} · ` : ""}
+                    {tonightBooking.reference ? (
+                      <>
+                        <span className="text-muted-foreground">Réf. </span>
+                        <span className="font-mono font-medium select-all">{tonightBooking.reference}</span>
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">sans référence</span>
+                    )}
+                  </p>
+                  {tonightBooking.accessCode && <SecretField label="Code d’accès" value={tonightBooking.accessCode} compact />}
+                </div>
+                {!tonightBooking.accessCode && tonightBooking.accessCodeSecure && <LockedSecret label="Code d’accès" />}
                 {tonightBooking.address && <p className="text-sm">{tonightBooking.address}</p>}
               </div>
             ) : (
@@ -114,15 +112,11 @@ export function TodayCard({
             )}
             <div className="mt-3 flex flex-wrap gap-2">
               <DirectionsButtons lat={overnight.lat} lng={overnight.lng} />
-              {tonightBooking?.phone ? (
+              {tonightBooking?.phone && (
                 <a href={telHref(tonightBooking.phone)} className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-11 min-w-36 flex-1")}>
                   <Phone className="size-4" />
                   Appeler
                 </a>
-              ) : (
-                <Button variant="outline" className="h-11 min-w-36 flex-1" onClick={() => onOpenStop(overnight.id)}>
-                  Fiche de l’étape
-                </Button>
               )}
             </div>
             {tonightBooking?.phone && <p className="mt-1 text-xs text-muted-foreground select-all">{tonightBooking.phone}</p>}

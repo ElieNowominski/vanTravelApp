@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseAmount, settleUp, totalsByCurrency, tripExpenseTotals } from "@/lib/expenses";
+import { expensesForStop, groupExpenses, parseAmount, settleUp, stopCosts, totalsByCurrency, tripExpenseTotals } from "@/lib/expenses";
 import type { Expense } from "@/lib/types";
 
 function expense(amount: number, paidBy: string, currency = "NZD", category: Expense["category"] = "autre"): Expense {
@@ -59,5 +59,62 @@ describe("parseAmount", () => {
     expect(parseAmount("abc")).toBeNull();
     expect(parseAmount("-3")).toBeNull();
     expect(parseAmount("1.234")).toBeNull();
+  });
+});
+
+describe("coûts par étape", () => {
+  const days = [
+    { expenses: [{ ...expense(48, "A", "NZD", "camping"), stopId: "camp" }, { ...expense(21, "B", "EUR", "resto"), stopId: "camp" }, expense(3, "A")] },
+    { expenses: [{ ...expense(98, "A", "NZD", "carburant"), stopId: "fairlie" }] },
+  ];
+
+  it("expensesForStop ne garde que les dépenses rattachées", () => {
+    expect(expensesForStop(days, "camp").map((e) => e.amount)).toEqual([48, 21]);
+    expect(expensesForStop(days, "nulle")).toEqual([]);
+  });
+
+  it("stopCosts additionne prix des réservations et dépenses, par devise", () => {
+    const out = stopCosts(
+      { bookings: [{ id: "b1", provider: "Camp", price: { amount: 48, currency: "NZD" } }, { id: "b2", provider: "Sans prix" }] },
+      expensesForStop(days, "camp"),
+    );
+    expect(out.lines.map((l) => [l.source, l.amount])).toEqual([
+      ["booking", 48],
+      ["expense", 48],
+      ["expense", 21],
+    ]);
+    expect(out.total).toEqual({ NZD: 96, EUR: 21 });
+  });
+});
+
+describe("groupExpenses", () => {
+  const snapshot = {
+    days: [
+      { date: "2027-02-07", label: "7 févr.", weekday: "Dim", stopIds: ["ville", "camp"], expenses: [{ ...expense(48, "A", "NZD", "camping"), id: "e1", updatedAt: "T1", stopId: "camp" }, { ...expense(3, "A"), id: "e2", updatedAt: "T2" }] },
+      { date: "2027-02-08", label: "8 févr.", weekday: "Lun", stopIds: ["camp", "lac"], expenses: [] },
+      { date: "2027-02-09", label: "9 févr.", weekday: "Mar", stopIds: ["lac"], expenses: [{ ...expense(98, "B", "NZD", "carburant"), id: "e3", updatedAt: "T0", stopId: "lac" }] },
+    ],
+    stops: { ville: { id: "ville", name: "Ville" }, camp: { id: "camp", name: "Camp" }, lac: { id: "lac", name: "Lac" } },
+  };
+
+  it("par jour : du plus récent au plus ancien, jours vides omis, dernière saisie en tête", () => {
+    const groups = groupExpenses(snapshot, "day");
+    expect(groups.map((g) => [g.key, g.detail, g.expenses.map((e) => e.id)])).toEqual([
+      ["2027-02-09", "jour 3", ["e3"]],
+      ["2027-02-07", "jour 1", ["e2", "e1"]],
+    ]);
+    expect(groups[1].total).toEqual({ NZD: 51 });
+  });
+
+  it("par étape : ordre de l'itinéraire, puis sans étape", () => {
+    expect(groupExpenses(snapshot, "stop").map((g) => [g.label, g.expenses.map((e) => e.id)])).toEqual([
+      ["Camp", ["e1"]],
+      ["Lac", ["e3"]],
+      ["Sans étape", ["e2"]],
+    ]);
+  });
+
+  it("par catégorie : dans l'ordre des catégories", () => {
+    expect(groupExpenses(snapshot, "category").map((g) => g.key)).toEqual(["carburant", "camping", "autre"]);
   });
 });

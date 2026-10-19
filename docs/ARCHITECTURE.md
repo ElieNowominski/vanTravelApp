@@ -49,6 +49,12 @@ Mode d'affichage : Voyager par défaut quand la date du jour dans le fuseau de l
 
 Schéma stocké **v3** (phase 5) : snapshot += `tombstones` (id -> date de suppression, posées par les actions de suppression du mode Voyager) ; étape += `notesAt` ; jour += `notesAt`, `weatherAt` ; réservation += `accessCodeSecure`.
 
+Schéma stocké **v4** (19 oct. 2026, navigation Voyager) : document d'étape += `scope` (`nuit` ou `activite` ; la migration pose `nuit` sur une étape de nuit, `activite` ailleurs) ; dépense += `stopId` optionnel (rattachée à une étape, sinon au seul jour) ; snapshot += `tripDocuments[]` (documents du voyage hors étape : passeport, assurance, contrat du van). Côté Supabase, rien à migrer : `scope` et `stopId` voyagent dans le `payload` jsonb, et un document de voyage est une ligne `travel_items` de kind `document` sous le scope réservé `trip` (`TRIP_DOCUMENTS_SCOPE`). Le coût d'une étape (`stopCosts`, `src/lib/expenses.ts`) additionne le prix de ses réservations et les dépenses qui lui sont rattachées.
+
+## Navigation du mode Voyager
+
+Depuis le 19 oct. 2026, la fiche d'une étape est une page (`/etape/:stopId`) et non plus un panneau bas : sections empilées (réservation, documents séparés en « Nuit · camping » et « Activités », coûts, à faire, notes), pastilles d'ancre sous l'en-tête, deux colonnes à partir de `md`. Les dépenses (`/depenses`, `/depenses/nouvelle`) et les documents (`/documents`) ont une vue globale du voyage, regroupée par jour, par étape ou par catégorie pour les dépenses (`groupExpenses`), par étape pour les documents (`groupDocuments`, `src/lib/documents.ts`). Barre du bas Jour · Dépenses · Documents · Roadbook (`VoyagerNav`, rangée du haut sur grand écran) ; la bande des jours ne reste que sur Jour. Les pages hors `/` passent par `VoyagerFrame` (réhydratation, bandeaux, navigation) et `useBack` (retour à la page précédente quand on y est venu depuis l'app, sinon vers une page de repli). Le jour affiché sur Jour (`travelDay`) vit dans le store sans être persisté : il survit à un passage par une fiche, pas à un rechargement.
+
 ## Synchronisation (phase 7, Supabase)
 
 Par voyage, dans Postgres, sous les règles par ligne `is_member(trip_id)` :

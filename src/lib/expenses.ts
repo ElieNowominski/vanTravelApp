@@ -1,4 +1,4 @@
-import type { Expense, ExpenseCategory, TripDay } from "@/lib/types";
+import type { Booking, Expense, ExpenseCategory, Stop, TripDay } from "@/lib/types";
 
 export const EXPENSE_CATEGORIES: Array<{ id: ExpenseCategory; label: string }> = [
   { id: "carburant", label: "Carburant" },
@@ -12,6 +12,21 @@ export const EXPENSE_CATEGORIES: Array<{ id: ExpenseCategory; label: string }> =
 
 export function categoryLabel(id: ExpenseCategory): string {
   return EXPENSE_CATEGORIES.find((c) => c.id === id)?.label ?? "Autre";
+}
+
+const CATEGORY_SHORT: Record<ExpenseCategory, string> = {
+  carburant: "Carb",
+  camping: "Nuit",
+  courses: "Cour",
+  resto: "Resto",
+  activite: "Act",
+  transport: "Trans",
+  autre: "Autre",
+};
+
+/** Abréviation pour une pastille de liste. */
+export function categoryShort(id: ExpenseCategory): string {
+  return CATEGORY_SHORT[id] ?? "Autre";
 }
 
 /** Totaux par devise : on n'additionne jamais deux devises entre elles. */
@@ -120,4 +135,103 @@ export function parseAmount(text: string): number | null {
 
 export function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/** Dépenses rattachées à une étape, tous jours confondus. */
+export function expensesForStop(days: Pick<TripDay, "expenses">[], stopId: string): Expense[] {
+  return allExpenses(days).filter((expense) => expense.stopId === stopId);
+}
+
+export type StopCostLine = {
+  id: string;
+  source: "booking" | "expense";
+  label: string;
+  amount: number;
+  currency: string;
+  paidBy?: string;
+};
+
+/** Coût d'une étape : le prix de ses réservations et les dépenses qui lui sont rattachées, par devise. */
+export function stopCosts(
+  stop: { bookings: Pick<Booking, "id" | "provider" | "price">[] },
+  expenses: Expense[],
+): { lines: StopCostLine[]; total: MoneyByCurrency } {
+  const lines: StopCostLine[] = [];
+  for (const booking of stop.bookings) {
+    if (!booking.price) continue;
+    lines.push({ id: booking.id, source: "booking", label: booking.provider, amount: booking.price.amount, currency: booking.price.currency });
+  }
+  for (const expense of expenses) {
+    lines.push({
+      id: expense.id,
+      source: "expense",
+      label: [categoryLabel(expense.category), expense.note].filter(Boolean).join(" · "),
+      amount: expense.amount,
+      currency: expense.currency,
+      paidBy: expense.paidBy || undefined,
+    });
+  }
+  const total: MoneyByCurrency = {};
+  for (const line of lines) total[line.currency] = round2((total[line.currency] ?? 0) + line.amount);
+  return { lines, total };
+}
+
+export type ExpenseGrouping = "day" | "stop" | "category";
+
+export type ExpenseGroup = {
+  key: string;
+  label: string;
+  /** Complément du titre (« jour 2 », « sans étape »). */
+  detail?: string;
+  expenses: Array<Expense & { dayIndex: number }>;
+  total: MoneyByCurrency;
+};
+
+/**
+ * Dépenses du voyage regroupées pour la page Dépenses. Par jour : du plus récent au plus ancien, les jours
+ * sans dépense omis. Par étape : dans l'ordre de l'itinéraire, puis « Sans étape ». Par catégorie : dans
+ * l'ordre des catégories. Dans un groupe, la saisie la plus récente vient en premier.
+ */
+export function groupExpenses(
+  snapshot: { days: Pick<TripDay, "date" | "label" | "weekday" | "stopIds" | "expenses">[]; stops: Record<string, Pick<Stop, "id" | "name">> },
+  grouping: ExpenseGrouping,
+): ExpenseGroup[] {
+  const all = snapshot.days.flatMap((day, dayIndex) => (day.expenses ?? []).map((expense) => ({ ...expense, dayIndex })));
+  const byUpdated = (a: Expense, b: Expense) => b.updatedAt.localeCompare(a.updatedAt);
+  const groups: ExpenseGroup[] = [];
+  const push = (key: string, label: string, detail: string | undefined, expenses: ExpenseGroup["expenses"]) => {
+    if (expenses.length === 0) return;
+    groups.push({ key, label, detail, expenses: [...expenses].sort(byUpdated), total: totalsByCurrency(expenses) });
+  };
+
+  if (grouping === "day") {
+    snapshot.days.forEach((day, dayIndex) => {
+      push(day.date, `${day.weekday} ${day.label}`, `jour ${dayIndex + 1}`, all.filter((e) => e.dayIndex === dayIndex));
+    });
+    return groups.reverse();
+  }
+
+  if (grouping === "stop") {
+    const seen = new Set<string>();
+    for (const day of snapshot.days) {
+      for (const stopId of day.stopIds) {
+        if (seen.has(stopId)) continue;
+        seen.add(stopId);
+        push(stopId, snapshot.stops[stopId]?.name ?? "Étape retirée", undefined, all.filter((e) => e.stopId === stopId));
+      }
+    }
+    for (const expense of all) {
+      if (expense.stopId && !seen.has(expense.stopId)) {
+        seen.add(expense.stopId);
+        push(expense.stopId, snapshot.stops[expense.stopId]?.name ?? "Étape retirée", undefined, all.filter((e) => e.stopId === expense.stopId));
+      }
+    }
+    push("none", "Sans étape", undefined, all.filter((e) => !e.stopId));
+    return groups;
+  }
+
+  for (const category of EXPENSE_CATEGORIES) {
+    push(category.id, category.label, undefined, all.filter((e) => e.category === category.id));
+  }
+  return groups;
 }

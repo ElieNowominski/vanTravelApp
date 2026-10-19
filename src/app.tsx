@@ -2,6 +2,10 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { CompareApp } from "@/components/compare-app";
 import { RoadbookPage } from "@/components/roadbook/roadbook-page";
 import { TripApp } from "@/components/trip-app";
+import { DocumentsPage } from "@/components/voyager/documents-page";
+import { ExpensesPage } from "@/components/voyager/expenses-page";
+import { NewExpensePage } from "@/components/voyager/new-expense-page";
+import { StopPage } from "@/components/voyager/stop-page";
 import { useKeyboardScrollReset } from "@/hooks/use-keyboard-scroll-reset";
 import { useApplyTheme } from "@/hooks/use-theme";
 
@@ -22,6 +26,10 @@ export function App() {
         <Route path="/" element={<TripApp />} />
         <Route path="/comparer" element={<CompareApp />} />
         <Route path="/roadbook" element={<RoadbookPage />} />
+        <Route path="/etape/:stopId" element={<StopPage />} />
+        <Route path="/depenses" element={<ExpensesPage />} />
+        <Route path="/depenses/nouvelle" element={<NewExpensePage />} />
+        <Route path="/documents" element={<DocumentsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

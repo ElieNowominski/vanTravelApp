@@ -64,17 +64,18 @@ export async function buildBackup(): Promise<BackupFile> {
 }
 
 /** Identifiants de documents référencés par des snapshots, sans doublon. */
-export function documentIdsOf(snapshots: Pick<TripSnapshot, "stops">[]): string[] {
+export function documentIdsOf(snapshots: Pick<TripSnapshot, "stops" | "tripDocuments">[]): string[] {
   const ids = new Set<string>();
   for (const snapshot of snapshots) {
     for (const stop of Object.values(snapshot.stops ?? {})) {
       for (const doc of stop.documents ?? []) ids.add(doc.id);
     }
+    for (const doc of snapshot.tripDocuments ?? []) ids.add(doc.id);
   }
   return [...ids];
 }
 
-async function collectDocumentBlobs(snapshots: Pick<TripSnapshot, "stops">[]): Promise<Record<string, string>> {
+async function collectDocumentBlobs(snapshots: Pick<TripSnapshot, "stops" | "tripDocuments">[]): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const id of documentIdsOf(snapshots)) {
     const blob = await getDocumentBlob(id);

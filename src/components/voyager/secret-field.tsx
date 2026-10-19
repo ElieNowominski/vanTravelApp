@@ -15,8 +15,11 @@ export function LockedSecret({ label }: { label: string }) {
   );
 }
 
-/** Code d'accès masqué par défaut, révélé au toucher, re-masqué après 20 s. */
-export function SecretField({ label, value }: { label: string; value: string }) {
+/**
+ * Code d'accès masqué par défaut, révélé au toucher, re-masqué après 20 s.
+ * `compact` : un simple bouton discret en ligne (le code sert rarement), le code s'affiche à sa place.
+ */
+export function SecretField({ label, value, compact = false }: { label: string; value: string; compact?: boolean }) {
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
@@ -24,6 +27,20 @@ export function SecretField({ label, value }: { label: string; value: string }) 
     const timer = window.setTimeout(() => setShown(false), 20_000);
     return () => window.clearTimeout(timer);
   }, [shown]);
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={() => setShown((v) => !v)}
+        className="inline-flex h-9 items-center gap-1.5 rounded-lg px-2 text-xs text-muted-foreground"
+        aria-label={shown ? `${label} : ${value}. Masquer` : `${label} masqué. Toucher pour révéler`}
+      >
+        {shown ? <EyeOff className="size-3.5" aria-hidden /> : <Eye className="size-3.5" aria-hidden />}
+        {shown ? <span className="font-mono text-sm font-semibold tracking-wider text-foreground">{value}</span> : label}
+      </button>
+    );
+  }
 
   return (
     <button

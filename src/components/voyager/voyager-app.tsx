@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { BookOpen, CalendarDays, ChevronRight, Moon, Receipt } from "lucide-react";
+import { CalendarDays, ChevronRight, Moon } from "lucide-react";
 import { InstallButton } from "@/components/install-button";
 import { ModeSwitch } from "@/components/mode-switch";
 import { NetworkBanner } from "@/components/network-banner";
@@ -8,11 +8,11 @@ import { SyncStatusButton } from "@/components/account/sync-status-button";
 import { UpdateBanner } from "@/components/update-banner";
 import { Button } from "@/components/ui/button";
 import { DayStrip } from "@/components/voyager/day-strip";
-import { ExpensesPanel } from "@/components/voyager/expenses-panel";
 import { ProfileButton, ProfileDialog } from "@/components/voyager/profile-dialog";
-import { StopSheet } from "@/components/voyager/stop-sheet";
 import { TodayCard } from "@/components/voyager/today-card";
+import { VoyagerNav } from "@/components/voyager/voyager-nav";
 import { DEFAULT_VEHICLE } from "@/lib/constants";
+import { expensesForStop, formatTotals, stopCosts, totalsByCurrency } from "@/lib/expenses";
 import { formatDateRange } from "@/lib/format";
 import { isProfileComplete } from "@/lib/profile";
 import { getRegion } from "@/lib/regions";
@@ -21,15 +21,15 @@ import { dayIndexForDate, daysBetween, summarizeDay, todayInZone, tripPhase } fr
 import { useProfileStore } from "@/store/profile-store";
 import { useTripStore } from "@/store/trip-store";
 
-type Tab = "day" | "expenses";
-
-/** Mode Voyager : l'écran par défaut en voyage. Tout ce qui s'affiche vient d'IndexedDB. */
+/** Mode Voyager, écran Jour : l'écran par défaut en voyage. Tout ce qui s'affiche vient d'IndexedDB. */
 export function VoyagerApp() {
   const config = useTripStore((s) => s.config);
   const days = useTripStore((s) => s.days);
   const stops = useTripStore((s) => s.stops);
   const legs = useTripStore((s) => s.legs);
   const setUiMode = useTripStore((s) => s.setUiMode);
+  const travelDay = useTripStore((s) => s.travelDay);
+  const setTravelDay = useTripStore((s) => s.setTravelDay);
   const profile = useProfileStore((s) => s.profile);
   const profileHydrated = useProfileStore((s) => s.hydrated);
 
@@ -37,9 +37,8 @@ export function VoyagerApp() {
   const today = todayInZone(region.timeZone);
   const todayIndex = dayIndexForDate(days, today);
   const phase = config ? tripPhase(config, today) : "before";
-  const [selected, setSelected] = useState(() => Math.max(0, todayIndex));
-  const [tab, setTab] = useState<Tab>("day");
-  const [openStopId, setOpenStopId] = useState<string | null>(null);
+  // Le jour choisi survit à un passage par une fiche d'étape (store, non persisté) ; sinon aujourd'hui.
+  const selected = Math.min(Math.max(0, travelDay ?? todayIndex), Math.max(0, days.length - 1));
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileDismissed, setProfileDismissed] = useState(false);
   // Première ouverture en voyage : le prénom est demandé une fois, sans bloquer (fermable).
@@ -47,7 +46,7 @@ export function VoyagerApp() {
 
   const snapshot = useMemo(() => ({ days, stops, legs }), [days, stops, legs]);
   const summary = useMemo(() => summarizeDay(snapshot, selected), [snapshot, selected]);
-  const openStop = openStopId ? (stops[openStopId] ?? null) : null;
+  const dayTotal = useMemo(() => totalsByCurrency(days[selected]?.expenses ?? []), [days, selected]);
 
   if (!config) return null;
 
@@ -76,50 +75,53 @@ export function VoyagerApp() {
               Départ dans {daysBetween(today, config.start.date)} jour{daysBetween(today, config.start.date) > 1 ? "s" : ""}
             </p>
           )}
+          {phase === "during" && (
+            <p className="text-right text-xs text-muted-foreground">
+              Jour {selected + 1} sur {days.length}
+            </p>
+          )}
           {phase === "after" && <p className="text-right text-xs text-muted-foreground">Voyage terminé</p>}
         </div>
       </header>
 
-      <DayStrip days={days} selected={selected} todayIndex={todayIndex} onSelect={setSelected} />
+      <DayStrip days={days} selected={selected} todayIndex={todayIndex} onSelect={setTravelDay} />
 
       <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
-          {tab === "day" && summary && (
+          {summary && (
             <>
               {todayIndex >= 0 && selected !== todayIndex && (
-                <Button variant="ghost" size="sm" className="h-9 w-fit" onClick={() => setSelected(todayIndex)}>
+                <Button variant="ghost" size="sm" className="h-9 w-fit" onClick={() => setTravelDay(null)}>
                   <CalendarDays className="size-3.5" />
                   Revenir à aujourd’hui
                 </Button>
               )}
-              <TodayCard
-                summary={summary}
-                isToday={selected === todayIndex}
-                vehicle={config.vehicle ?? DEFAULT_VEHICLE}
-                onOpenStop={setOpenStopId}
-              />
+              <TodayCard summary={summary} isToday={selected === todayIndex} vehicle={config.vehicle ?? DEFAULT_VEHICLE} />
               <section className="flex flex-col gap-2">
-                <h3 className="text-sm font-medium">Étapes du jour</h3>
+                <div className="flex items-baseline justify-between gap-2">
+                  <h3 className="text-sm font-medium">Étapes du jour</h3>
+                  <Link to="/depenses" className="text-sm text-primary">
+                    Dépenses du jour : {formatTotals(dayTotal)}
+                  </Link>
+                </div>
                 {summary.stops.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Aucune étape posée ce jour.</p>
                 ) : (
                   <ol className="flex flex-col divide-y rounded-xl bg-card ring-1 ring-foreground/10">
                     {summary.stops.map((stop, index) => {
                       const open = stop.checklist.filter((i) => !i.done).length;
+                      const costs = stopCosts(stop, expensesForStop(days, stop.id));
+                      const isNight = stop.id === summary.overnight?.id;
                       return (
                         <li key={stop.id}>
-                          <button
-                            type="button"
-                            className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left"
-                            onClick={() => setOpenStopId(stop.id)}
-                          >
+                          <Link to={`/etape/${stop.id}`} className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left">
                             <span
                               className={cn(
                                 "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                                stop.isOvernight ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
+                                isNight ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
                               )}
                             >
-                              {stop.isOvernight ? <Moon className="size-3.5" /> : index + 1}
+                              {isNight ? <Moon className="size-3.5" /> : index + 1}
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm font-medium">{stop.name}</span>
@@ -129,14 +131,14 @@ export function VoyagerApp() {
                                   stop.bookings.length > 0 ? `${stop.bookings.length} réservation${stop.bookings.length > 1 ? "s" : ""}` : null,
                                   stop.documents.length > 0 ? `${stop.documents.length} doc${stop.documents.length > 1 ? "s" : ""}` : null,
                                   open > 0 ? `${open} à faire` : null,
-                                  stop.activities.length > 0 ? `${stop.activities.length} activité${stop.activities.length > 1 ? "s" : ""}` : null,
+                                  costs.lines.length > 0 ? formatTotals(costs.total) : null,
                                 ]
                                   .filter(Boolean)
                                   .join(" · ") || "Toucher pour la fiche"}
                               </span>
                             </span>
                             <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                          </button>
+                          </Link>
                         </li>
                       );
                     })}
@@ -145,31 +147,11 @@ export function VoyagerApp() {
               </section>
             </>
           )}
-          {tab === "expenses" && (
-            <ExpensesPanel
-              days={days}
-              dayIndex={selected}
-              defaultCurrency={region.currency}
-              profile={profile}
-              onEditProfile={() => setProfileOpen(true)}
-            />
-          )}
         </div>
       </main>
 
-      <nav aria-label="Sections" className="flex shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom,0px)]">
-        <BottomTab active={tab === "day"} onClick={() => setTab("day")} icon={<CalendarDays className="size-5" />} label="Jour" />
-        <BottomTab active={tab === "expenses"} onClick={() => setTab("expenses")} icon={<Receipt className="size-5" />} label="Dépenses" />
-        <Link
-          to="/roadbook"
-          className="flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs font-medium text-muted-foreground"
-        >
-          <BookOpen className="size-5" />
-          Roadbook
-        </Link>
-      </nav>
+      <VoyagerNav active="jour" />
 
-      <StopSheet stop={openStop} defaultCurrency={region.currency} onClose={() => setOpenStopId(null)} />
       <ProfileDialog
         open={profileOpen || promptProfile}
         onClose={() => {
@@ -178,22 +160,5 @@ export function VoyagerApp() {
         }}
       />
     </div>
-  );
-}
-
-function BottomTab({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
-  return (
-    <button
-      type="button"
-      aria-current={active ? "page" : undefined}
-      onClick={onClick}
-      className={cn(
-        "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs font-medium",
-        active ? "text-primary" : "text-muted-foreground",
-      )}
-    >
-      {icon}
-      {label}
-    </button>
   );
 }

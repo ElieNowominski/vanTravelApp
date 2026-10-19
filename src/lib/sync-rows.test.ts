@@ -10,6 +10,7 @@ import {
   rowsToTravelDoc,
   storageObjectPath,
   toIso,
+  TRIP_DOCUMENTS_SCOPE,
   tombstonesToRows,
   travelDocToRows,
 } from "@/lib/sync-rows";
@@ -128,5 +129,17 @@ describe("storageObjectPath", () => {
     expect(storageObjectPath("nz", { ...doc, path: "trips/nz/docs/doc-1.png" })).toBe("nz/doc-1.png");
     expect(documentExtension({ kind: "pdf", mimeType: "application/pdf", path: "" })).toBe("pdf");
     expect(documentExtension({ kind: "image", mimeType: "image/png", path: "" })).toBe("png");
+  });
+});
+
+describe("documents de voyage", () => {
+  it("voyagent sous le scope réservé et reviennent hors étape", () => {
+    const doc = travelDoc();
+    doc.tripDocuments = [{ id: "doc-t", updatedAt: T0, updatedBy: "elie", kind: "pdf", path: "", size: 5, mimeType: "application/pdf", caption: "Assurance" }];
+    const rows = travelDocToRows("nz", doc);
+    expect(rows.find((r) => r.id === "doc-t")).toMatchObject({ kind: "document", scope: TRIP_DOCUMENTS_SCOPE });
+    const back = rowsToTravelDoc(rows);
+    expect(back.tripDocuments?.map((d) => d.id)).toEqual(["doc-t"]);
+    expect(Object.keys(back.stops)).toEqual(["s1"]);
   });
 });
