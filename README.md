@@ -64,7 +64,7 @@ La bibliothèque (icône dossier) exporte un JSON avec le circuit affiché, tous
 
 ## Déploiement
 
-Le workflow `.github/workflows/deploy.yml` lint, teste, télécharge les données, construit avec `BASE_PATH=/<nom-du-dépôt>/` et les variables du dépôt `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_KEY` (*Settings > Secrets and variables > Actions > Variables*), puis publie sur GitHub Pages à chaque push sur `main`, plus un rafraîchissement hebdomadaire des données. Activer Pages une fois : *Settings > Pages > Source : GitHub Actions*. `keepalive.yml` appelle `beat()` tous les deux jours pour que le projet Supabase gratuit ne se mette pas en pause.
+Le workflow `.github/workflows/deploy.yml` lint, teste, télécharge les données, construit avec `BASE_PATH=/<nom-du-dépôt>/` et les variables du dépôt `VITE_SUPABASE_URL` et `VITE_SUPABASE_PUBLISHABLE_KEY` (*Settings > Secrets and variables > Actions > Variables*), puis publie sur GitHub Pages à chaque push sur `main`, plus un rafraîchissement hebdomadaire des données. Activer Pages une fois : *Settings > Pages > Source : GitHub Actions*. `keepalive.yml` appelle `beat()` toutes les six heures pour que le projet Supabase gratuit ne se mette pas en pause.
 
 Côté Supabase : exécuter `supabase/schema.sql` (projet neuf) ou les migrations de `supabase/migrations/` (projet existant) dans SQL Editor, puis `node scripts/rls-check.mjs` avec deux comptes de test (variables d'environnement, voir l'en-tête du script).
 

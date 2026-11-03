@@ -39,7 +39,7 @@ Téléphone / PC (PWA)                       Supabase (projet, région UE)
 └──────────────────────────┘               │ Storage : bucket documents   │
                                            └──────────────────────────────┘
 GitHub Pages : site statique, clé publiable injectée au build (variables du dépôt).
-GitHub Actions : build et déploiement ; cron de maintien en éveil tous les deux jours.
+GitHub Actions : build et déploiement ; cron de maintien en éveil toutes les six heures.
 ```
 
 Règles d'or :
@@ -263,7 +263,7 @@ Travail sur une branche `supabase` (demande explicite d'écart à la règle 10 :
 ### Lot F : déploiement, veille, nettoyage (0,25 j)
 
 - `deploy.yml` : `env` du build avec `VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}` et la clé publiable.
-- `.github/workflows/keepalive.yml` : `schedule: "17 6 */2 * *"` (tous les deux jours, hors début d'heure) + `workflow_dispatch`, un `curl -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/beat" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"`. Rappel : GitHub désactive les workflows planifiés après 60 jours sans activité du dépôt.
+- `.github/workflows/keepalive.yml` : `schedule: "17 */6 * * *"` (toutes les six heures, hors début d'heure ; tous les deux jours n'a pas suffi, avertissement de pause le 3 nov. 2026) + `workflow_dispatch`, un `curl -X POST "$VITE_SUPABASE_URL/rest/v1/rpc/beat" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"`. Rappel : GitHub désactive les workflows planifiés après 60 jours sans activité du dépôt.
 - Suppression de `github-repo.ts` et son test, du plugin Vite, de `trip-source.ts`, de `PRIVATE_DATA_DIR`, des champs GitHub du store et du dialogue. `CLAUDE.md` : règle 1 réécrite (les données vivent dans Supabase ; rien de personnel dans le dépôt, qui est public), règle 2 réécrite (« pas de serveur à nous : Supabase est le backend, aucune clé secrète dans le front »), section « Synchro » mise à jour. `ARCHITECTURE.md` : section Synchronisation réécrite, décision Supabase datée avec les alternatives écartées (Firebase, Cloudflare, PocketBase, chiffrement sur GitHub). `PLAN.md` : phase 7 cochée. `README.md` : « Où sont les données » et « Lancer en local » (variables).
 - Dépôt `vanTravel` : archivé sur GitHub (lecture seule) après validation ; le dossier `trips/` y reste comme sauvegarde historique.
 

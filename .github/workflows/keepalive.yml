@@ -1,12 +1,13 @@
 name: Keep Supabase awake
 
-# Le projet Supabase gratuit se met en pause après une semaine sans requête : un appel tous les deux
-# jours à la fonction `beat()` (clé publiable, aucune donnée) suffit. Rappel : GitHub désactive les
+# Le projet Supabase gratuit se met en pause sans « quelques requêtes par jour » sur la semaine (doc Supabase) :
+# un appel toutes les six heures à la fonction `beat()` (clé publiable, aucune donnée). Un appel tous les deux jours
+# n'a pas suffi (avertissement de pause reçu le 3 nov. 2026). Rappel : GitHub désactive les
 # workflows planifiés après 60 jours sans activité du dépôt ; `workflow_dispatch` permet de relancer à la main.
 
 on:
   schedule:
-    - cron: "17 6 */2 * *"
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:
