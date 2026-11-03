@@ -4,7 +4,7 @@
  * créés pour l'occasion (jamais les vrais comptes). À relancer après tout changement de schéma.
  *
  * Variables d'environnement :
- *   SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY   (par défaut lues dans .env.local)
+ *   SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY   (par défaut lues dans .env.next.local, projet vantravel-next de la branche v2)
  *   RLS_A_EMAIL, RLS_A_PASSWORD              compte A (propriétaire du voyage de test)
  *   RLS_B_EMAIL, RLS_B_PASSWORD              compte B (tiers, puis membre)
  *
@@ -22,8 +22,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
+// Branche v2 : jamais de repli sur .env.local, qui pointe sur la production.
 function readEnvLocal() {
-  const file = path.resolve(".env.local");
+  const file = path.resolve(".env.next.local");
   if (!fs.existsSync(file)) return {};
   const out = {};
   for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
@@ -38,7 +39,8 @@ const url = process.env.SUPABASE_URL || envLocal.VITE_SUPABASE_URL;
 const key = process.env.SUPABASE_PUBLISHABLE_KEY || envLocal.VITE_SUPABASE_PUBLISHABLE_KEY;
 const A = { email: process.env.RLS_A_EMAIL, password: process.env.RLS_A_PASSWORD };
 const B = { email: process.env.RLS_B_EMAIL, password: process.env.RLS_B_PASSWORD };
-if (!url || !key) die("SUPABASE_URL et SUPABASE_PUBLISHABLE_KEY manquants (ou .env.local absent).");
+if (!url || !key) die("SUPABASE_URL et SUPABASE_PUBLISHABLE_KEY manquants (ou .env.next.local absent).");
+console.log(`Projet contrôlé : ${new URL(url).host}`);
 if (!A.email || !A.password || !B.email || !B.password) die("RLS_A_EMAIL, RLS_A_PASSWORD, RLS_B_EMAIL, RLS_B_PASSWORD requis.");
 
 function die(message) {

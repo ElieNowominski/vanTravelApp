@@ -43,7 +43,8 @@ Options :
 
 - [x] Port de dev 43218 sur la branche (`package.json`, `vite.config.ts`, `README.md`, `CLAUDE.md`, règle `liberer-port-dev.mdc`).
 - [ ] À faire par la personne : créer le projet Supabase `vantravel-next` (offre gratuite, deuxième et dernier projet actif possible), y exécuter `supabase/schema.sql`, puis les migrations `0002` et `0003`, désactiver la confirmation d'e-mail le temps des tests, créer deux comptes de test. Authentication > URL Configuration : Site URL et Redirect URLs `http://127.0.0.1:43218/` (+ `http://<ip-du-pc>:43218/` pour le téléphone).
-- [ ] À faire par la personne : `.env.local` pointé sur `vantravel-next` (URL et clé publiable) tant que la branche est extraite. Garder une copie du `.env.local` de la production pour les correctifs sur `main`.
+- [x] Variables séparées sans échange de fichiers (3 nov. 2026) : sur la branche, `npm run dev` passe `--mode next`, donc Vite lit `.env.next.local` (ignoré par git) par-dessus `.env.local`, qui reste celui de la production pour les correctifs sur `main`. Valeurs vides : l'app tourne sans compte, jamais sur la production. `scripts/rls-check.mjs` ne lit plus que `.env.next.local` et affiche le projet visé.
+- [ ] À faire par la personne : remplir `.env.next.local` avec l'URL et la clé publiable de `vantravel-next`.
 - [ ] `scripts/rls-check.mjs` lancé sur `vantravel-next`.
 - Pas de `keepalive` pour `vantravel-next` : le workflow planifié ne tourne que depuis `main`, gelé. Après une semaine sans usage, le projet se met en pause ; le relancer depuis le tableau de bord Supabase avant une session de travail.
 

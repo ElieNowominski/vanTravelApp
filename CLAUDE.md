@@ -27,7 +27,7 @@ Modèle pur dans `src/lib/sync-model.ts` (fusion, extraction, réinjection, déc
 ## Commandes
 
 ```bash
-npm run dev         # http://127.0.0.1:43218 (variables Supabase lues dans .env.local, voir .env.example)
+npm run dev         # http://127.0.0.1:43218 (v2 : mode next, variables Supabase de vantravel-next lues dans .env.next.local par-dessus .env.local)
 npm run data        # jeux de données publics -> public/data/generated/
 npm run lint && npm run typecheck && npm test
 npm run build       # dist/ (BASE_PATH=/vanTravelApp/ sur Pages)
