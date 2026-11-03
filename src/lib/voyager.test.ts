@@ -114,6 +114,18 @@ describe("summarizeDay", () => {
     expect(s.tonightBooking?.reference).toBe("R1");
     expect(s.km).toBe(300);
     expect(s.estimated).toBe(true);
+    expect(s.modes).toBe("en van");
+    expect(s.transports).toEqual([]);
+  });
+
+  it("jour avec ferry : le ferry compte dans la durée du jour, pas dans le temps au volant", () => {
+    const ferry = { ...snapshot.legs[1], mode: "ferry" as const, track: "aucun" as const, options: [], estimated: false, manual: { durationSec: 3600, distanceKm: 40, departAt: "8 h" } };
+    const s = summarizeDay({ ...snapshot, legs: [snapshot.legs[0], ferry, snapshot.legs[2]] }, 1)!;
+    expect(s.driveSec).toBe(14_000);
+    expect(s.roadSec).toBe(10_400);
+    expect(s.km).toBe(240);
+    expect(s.modes).toBe("en ferry et van");
+    expect(s.transports.map((leg) => leg.manual?.departAt)).toEqual(["8 h"]);
   });
 
   it("jour vide : pas d'étape, départ hérité", () => {

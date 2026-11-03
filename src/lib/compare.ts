@@ -1,6 +1,7 @@
 import { DEFAULT_PROFILE } from "@/lib/profiles";
 import type { SavedTrip } from "@/lib/types";
-import { selectedOption, dayStats } from "@/store/trip-store";
+import { legCoordinates } from "@/lib/legs";
+import { dayStats } from "@/store/trip-store";
 
 export type DriveDay = {
   dayIndex: number;
@@ -35,7 +36,7 @@ export function compareStats(trip: SavedTrip): CompareStats {
     stopCount += stats.stopCount;
     if (stats.overnight) nights += 1;
     const maxHours = trip.config?.profile.maxComfortableDriveHours ?? DEFAULT_PROFILE.maxComfortableDriveHours;
-    if (stats.driveSec / 3600 > maxHours) longDays += 1;
+    if (stats.roadSec / 3600 > maxHours) longDays += 1;
     const used = stats.stopCount > 0 || Boolean(stats.overnight);
     if (used) {
       const driveDay: DriveDay = {
@@ -85,11 +86,11 @@ export function tripRouteFeatures(
       });
     }
     for (const leg of trip.legs.filter((item) => item.dayIndex === dayIndex)) {
-      const option = selectedOption(leg);
-      if (!option) continue;
+      const coordinates = legCoordinates(leg, trip.stops);
+      if (coordinates.length < 2) continue;
       lines.push({
         type: "Feature",
-        geometry: option.geometry,
+        geometry: { type: "LineString", coordinates },
         properties: { color, tripIndex, tripName: trip.name, dayIndex },
       });
     }

@@ -7,7 +7,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { DirectionsButtons } from "@/components/voyager/directions-buttons";
 import { LockedSecret, SecretField } from "@/components/voyager/secret-field";
 import { useDraftField } from "@/hooks/use-draft-field";
+import { formatMoney } from "@/lib/expenses";
 import { formatDayDrive, isRestDay } from "@/lib/format";
+import { legSummary } from "@/lib/legs";
 import type { Vehicle } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { directionsLinks, telHref, type DaySummary } from "@/lib/voyager";
@@ -24,7 +26,8 @@ export function TodayCard({ summary, isToday, vehicle }: { summary: DaySummary; 
   const notes = useDraftField(summary.day.notes ?? "", (next) => setDayNotes(summary.dayIndex, next));
   const { day, dayIndex, departure, nextStop, overnight, tonightBooking, driveSec, km } = summary;
   const rest = isRestDay(km, driveSec);
-  const tooLong = driveSec / 3600 > vehicle.maxComfortableDriveHours;
+  const tooLong = summary.roadSec / 3600 > vehicle.maxComfortableDriveHours;
+  const stops = useTripStore((s) => s.stops);
 
   return (
     <div className="flex flex-col gap-3">
@@ -46,10 +49,27 @@ export function TodayCard({ summary, isToday, vehicle }: { summary: DaySummary; 
           <span className="font-medium">{overnight?.name ?? nextStop?.name ?? "à définir"}</span>
         </p>
         <p className={cn("mt-1 text-sm", tooLong ? "text-destructive" : "text-muted-foreground")}>
-          {rest ? "Journée sur place" : `${formatDayDrive(km, driveSec)} en van`}
+          {rest ? "Journée sur place" : `${formatDayDrive(km, driveSec)} ${summary.modes}`}
           {summary.estimated ? " · estimé" : ""}
-          {tooLong ? ` · plus de ${vehicle.maxComfortableDriveHours} h` : ""}
+          {tooLong ? ` · plus de ${vehicle.maxComfortableDriveHours} h au volant` : ""}
         </p>
+        {summary.transports.length > 0 && (
+          <ul className="mt-2 flex flex-col gap-1.5">
+            {summary.transports.map((leg) => (
+              <li key={leg.id} className="rounded-lg bg-muted/50 px-2.5 py-1.5 text-sm">
+                <p className="font-medium">
+                  {stops[leg.fromStopId]?.name ?? "Départ"} → {stops[leg.toStopId]?.name ?? "?"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {legSummary(leg)}
+                  {leg.manual?.operator ? ` · ${leg.manual.operator}` : ""}
+                  {leg.manual?.price ? ` · ${formatMoney(leg.manual.price.amount, leg.manual.price.currency)}` : ""}
+                </p>
+                {leg.manual?.notes && <p className="text-xs text-muted-foreground">{leg.manual.notes}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
         {nextStop && nextStop.id !== overnight?.id && (
           <div className="mt-3 flex items-center justify-between gap-2">
             <div className="min-w-0">

@@ -6,7 +6,8 @@ import { formatDayDrive, formatDuration, formatKm, isRestDay } from "@/lib/forma
 import { overnightCaption, stayById } from "@/lib/trip-plan";
 import { normalizeMarks } from "@/lib/trip-marks";
 import type { TripConfig, TripMark } from "@/lib/types";
-import { dayStats, selectedOption, type TripState } from "@/store/trip-store";
+import { legCoordinates, legSummary, selectedOption } from "@/lib/legs";
+import { dayStats, type TripState } from "@/store/trip-store";
 
 type PdfDoc = jsPDF & { getNumberOfPages: () => number };
 
@@ -140,7 +141,12 @@ export async function exportTripPdf(
               (l) => l.fromStopId === day.stopIds[stopIndex - 1] && l.toStopId === stopId,
             );
       const opt = inbound ? selectedOption(inbound) : null;
-      if (opt) {
+      if (inbound?.track === "aucun") {
+        const fromName = state.stops[inbound.fromStopId]?.name ?? "Départ";
+        const operator = inbound.manual?.operator ? `  ·  ${inbound.manual.operator}` : "";
+        write(`${fromName}  →  ${stop.name}`, 8, [70, 90, 80], "bold", 5);
+        write(`${legSummary(inbound)}${operator}`, 8, [110, 110, 110], "normal", 7);
+      } else if (opt) {
         const fromStop = inbound ? state.stops[inbound.fromStopId] : null;
         const fromName = fromStop?.name ?? "Départ";
         const winding = opt.winding ? " · route lente" : "";
@@ -290,9 +296,7 @@ function drawTripMap(
     points.push([stop.lng, stop.lat]);
   }
   for (const leg of state.legs) {
-    const opt = selectedOption(leg);
-    if (!opt) continue;
-    for (const coord of downsample(opt.geometry.coordinates, 180)) {
+    for (const coord of downsample(legCoordinates(leg, state.stops), 180)) {
       points.push([coord[0], coord[1]]);
     }
   }
@@ -315,13 +319,14 @@ function drawTripMap(
     doc.setLineCap("round");
     doc.setLineJoin("round");
     for (const leg of dayLegs) {
-      const opt = selectedOption(leg);
-      if (!opt) continue;
-      const line = downsample(opt.geometry.coordinates, 220).map(([lng, lat]) => project(lng, lat));
+      const line = downsample(legCoordinates(leg, state.stops), 220).map(([lng, lat]) => project(lng, lat));
       if (line.length < 2) continue;
+      // Tronçon sans tracé (train, ferry) : pointillé, comme sur la carte.
+      if (leg.track === "aucun") doc.setLineDashPattern([1.6, 1.2], 0);
       for (let i = 1; i < line.length; i++) {
         doc.line(line[i - 1][0], line[i - 1][1], line[i][0], line[i][1]);
       }
+      if (leg.track === "aucun") doc.setLineDashPattern([], 0);
     }
   }
 

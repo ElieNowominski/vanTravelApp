@@ -1,6 +1,6 @@
-import { legDistanceKm, legDurationSec } from "@/lib/legs";
+import { dayModesLabel, legDistanceKm, legDurationSec, roadDurationSec } from "@/lib/legs";
 import { isIosUserAgent } from "@/lib/pwa";
-import type { Booking, Stop, TripConfig, TripDay, TripSnapshot } from "@/lib/types";
+import type { Booking, Leg, Stop, TripConfig, TripDay, TripSnapshot } from "@/lib/types";
 
 export type AppMode = "plan" | "travel";
 
@@ -87,8 +87,14 @@ export type DaySummary = {
   /** Réservation à afficher pour la nuit : la première de l'étape de nuit. */
   tonightBooking: Booking | null;
   driveSec: number;
+  /** Temps au volant seul (tronçons routiers), comparé au seuil de confort du profil. */
+  roadSec: number;
   km: number;
   estimated: boolean;
+  /** « en van », « en van et ferry ». */
+  modes: string;
+  /** Tronçons sans tracé du jour (train, ferry), avec leur horaire. */
+  transports: Leg[];
 };
 
 export function summarizeDay(snapshot: Pick<TripSnapshot, "days" | "stops" | "legs">, dayIndex: number): DaySummary | null {
@@ -110,8 +116,11 @@ export function summarizeDay(snapshot: Pick<TripSnapshot, "days" | "stops" | "le
     overnight,
     tonightBooking: overnight?.bookings[0] ?? null,
     driveSec,
+    roadSec: roadDurationSec(dayLegs),
     km,
     estimated: dayLegs.some((leg) => leg.estimated),
+    modes: dayModesLabel(dayLegs),
+    transports: dayLegs.filter((leg) => leg.track === "aucun"),
   };
 }
 

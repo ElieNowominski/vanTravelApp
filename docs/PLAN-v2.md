@@ -21,7 +21,7 @@ Prompt de reprise :
 - [x] Lot 1 : modèle v5 et voyage fictif de référence (3 nov. 2026 : 141 tests, parcours vérifié dans le navigateur)
 - [x] Lot 2 : schéma Supabase (rôles, plafonds)
 - [x] Lot 3 : géographie libre (3 nov. 2026 : recherche Photon, appui long, plus de région par défaut ; 173 tests, parcours vérifié dans le navigateur)
-- [ ] Lot 4 : routage par tronçon
+- [x] Lot 4 : routage par tronçon (3 nov. 2026 : mode par tronçon, saisie manuelle des trains et ferries ; 187 tests, parcours vérifié dans le navigateur)
 - [ ] Lot 5 : points d'intérêt OSM à la demande
 - [ ] Lot 6 : accueil et création (maquettes puis code)
 - [ ] Lot 7 : dépenses multi-devises et à plusieurs
@@ -78,9 +78,15 @@ Options :
 
 ## Lot 4 : routage par tronçon
 
-- [ ] Interface de routage dans `src/services` : calculer un tronçon pour un mode donné. OSRM (serveur public) pour van, voiture et moto, avec les facteurs du profil.
-- [ ] Train et ferry : tronçon saisi à la main (horaire, durée, prix), sans tracé ou en ligne droite.
-- [ ] Noté pour l'ouverture au public : le serveur de démonstration OSRM n'est pas fait pour un service en production ; passer à OpenRouteService ou GraphHopper via une Edge Function Supabase.
+- [x] Interface de routage `routeLeg(from, to, mode, profile)` dans `src/services/routing.ts` : OSRM (serveur de démonstration) pour van, voiture et moto, durée ajustée par les facteurs du profil ; une requête par seconde au plus, désormais imposée dans le code (file d'attente) et plus seulement écrite dans la règle 8. Repli en ligne droite estimée sans réseau, comme avant. Testé avec `fetch` simulé (`routing.test.ts`).
+- [x] Train, ferry, vélo, marche : tronçon sans tracé, aucune requête réseau. À la création ou au changement de mode, durée et distance estimées depuis le vol d'oiseau (vitesse et détour par mode, `estimateManualLeg`, marqué « estimé ») ; la personne saisit ensuite départ, arrivée, durée (ou rien : elle se déduit des deux heures, passage de minuit compris), distance, compagnie, prix et notes. Logique pure dans `src/lib/legs.ts` (`parseClock`, `parseDurationInput`, `applyManualInput`, `legSummary`, `legCoordinates`).
+- [x] Écran : la ligne du tronçon dans Planifier ouvre un éditeur (`src/components/leg-editor.tsx`) avec le mode, les routes au choix ou le formulaire d'horaire. Carte, croquis du roadbook, PDF et comparateur relient les deux étapes d'un tronçon sans tracé par une ligne droite en pointillé. Roadbook et carte « Aujourd'hui » de Voyager affichent horaire, compagnie, prix et notes ; Voyager dit « en van et ferry ».
+- [x] Le seuil de confort du profil (« +4 h ») ne compte plus que le temps au volant (`roadSec`) : un ferry de trois heures n'est pas de la conduite. La durée du jour affichée reste celle de tous les tronçons.
+- [x] Schéma : `ManualLeg.price` (optionnel, `Money`), lu par `normalizeManualLeg` et testé, sans changement de version (la v5 n'est pas encore publiée). La signature d'itinéraire de la synchro inclut désormais mode, type de tracé et saisie manuelle : avant, changer un horaire ne relevait pas la modification d'itinéraire.
+- [x] Défaut corrigé au parcours : à 375 px, la barre d'outils du panneau Planifier débordait de 74 px (antérieur au lot 4) ; elle passe à la ligne.
+- Écarts : le prix d'un billet reste pour mémoire et n'entre pas dans les dépenses (le lot 7 décidera s'il en crée une) ; le vélo et la marche n'ont pas de tracé (serveurs de routage vélo et piéton non étudiés, le trek est hors de la v2) ; changer de mode recalcule le tronçon, mais retirer une étape reconstruit le tronçon dans le mode par défaut du voyage.
+- Non vérifié : le PDF n'a pas été ouvert (export non déclenché dans le navigateur), seul le code du pointillé et de la ligne du ferry a changé ; le mode par défaut d'un voyage ne se choisit pas encore à la création (lot 6).
+- [ ] Noté pour l'ouverture au public : le serveur de démonstration OSRM n'est pas fait pour un service en production ; passer à OpenRouteService ou GraphHopper via une Edge Function Supabase, derrière `routeLeg`.
 
 ## Lot 5 : points d'intérêt OSM à la demande
 

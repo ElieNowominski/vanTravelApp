@@ -173,3 +173,23 @@ Les entrées antérieures au 7 octobre 2026 sont reconstituées après coup depu
   - Un lieu OSM garde un identifiant stable `osm:<type><id>` et `meta.source` ; aucun changement de schéma stocké.
   - Le départ ne garde pas la localisation du lieu (le repère n'a pas de champ `area`) : ajouter ce champ touche la forme du voyage, reporté à l'écran de création.
 - **Chiffres** : 173 tests en 25 fichiers (152 avant) ; une requête Photon pour un mot de douze lettres tapé d'un trait ; réponses de Photon entre 2 et 3,5 s pendant les essais.
+
+## 2026-11-03 : v2, lot 4 (routage par tronçon)
+
+- **Intention** : qu'un tronçon ait vraiment son mode : la route calculée pour le van, la voiture ou la moto, un horaire saisi pour un train ou un ferry, et que le reste de l'app (carte, roadbook, Voyager, seuil de conduite) en tienne compte.
+- **Demandes** : « Go Lot 4 v2 ».
+- **Livré** : `routeLeg` dans `src/services/routing.ts` (OSRM cadencé à une requête par seconde, aucun appel pour les modes manuels) ; logique pure des tronçons dans `src/lib/legs.ts` (estimation par mode, lecture des heures et durées tapées, saisie appliquée, trait en ligne droite, résumé « Ferry · 8 h 00 → 11 h 15 · 3 h 15 · 140 km ») ; actions `setLegMode` et `updateLegManual` dans le store ; éditeur de tronçon dans Planifier ; pointillé sur la carte, le croquis du roadbook, le PDF et le comparateur ; horaire, compagnie, prix et notes dans le roadbook et la carte « Aujourd'hui » ; prix optionnel sur le tronçon manuel ; 14 tests de plus, dont le deuxième test de service réseau du dépôt.
+- **Cassé ou appris** :
+  - La signature d'itinéraire de la synchro ne regardait que l'identifiant, les étapes, l'option choisie et le nombre d'options d'un tronçon : un changement de mode ou d'horaire n'aurait pas daté l'itinéraire local, donc aurait perdu face au serveur. Repéré à la lecture du code avant d'écrire l'action, corrigé et testé.
+  - Le badge « +4 h » additionnait ferry et conduite : la journée Aarhus, Hirtshals, ferry, Kristiansand du voyage de référence (2 h 36 de route) était marquée trop longue.
+  - Premier jet : `routeLeg` renvoyait l'avertissement mêlé au tronçon, ce qui forçait des déstructurations avec une variable inutilisée que le lint refuse ; la fonction renvoie `{ leg, warning }`.
+  - Au parcours à 375 px, la page débordait de 74 px : la barre d'outils du panneau Planifier, antérieure au lot. Elle n'apparaissait pas au premier contrôle parce que l'onglet Carte était affiché, le panneau masqué. Les boutons de l'éditeur faisaient 28 px de haut sur mobile, sous les 44 px de la règle 4 : corrigé avant la fin du parcours.
+  - Le parcours modifie le brouillon local du port 43218 (voyage de référence) : la saisie de test du ferry a été remise à ses valeurs d'origine à la fin ; le tronçon Copenhague, Aarhus a été recalculé par OSRM (mêmes 304 km et 4 h 28).
+  - Un heredoc Bash trop long a encore échoué (piège connu) : script écrit dans le brouillon de session puis lancé.
+- **Décisions** :
+  - Pas de nouvelle version de schéma pour `manual.price` : champ optionnel, lu par le normaliseur, et la v5 n'a pas quitté la branche.
+  - Le prix d'un billet n'est pas une dépense : le compter deux fois (billet et dépense) serait pire que de ne pas l'additionner ; le lot 7 tranchera.
+  - Une estimation s'affiche en indication dans le champ « Durée » (« ≈ 2 h 25 ») et non en valeur, pour que la personne saisisse l'horaire réel au lieu de valider l'estimation sans la lire. Un nombre seul se lit en heures (« 2 », « 1,5 »).
+  - Entre deux modes routiers, la route reste la même (un profil par voyage) ; entre deux modes manuels, un horaire déjà saisi reste ; passer d'un mode à l'autre recalcule.
+  - Vélo et marche sans tracé plutôt que par un serveur de routage vélo ou piéton : politique d'usage non vérifiée, et le trek est hors de la v2.
+- **Chiffres** : 187 tests en 26 fichiers (173 avant) ; une requête OSRM par changement vers un mode routier, aucune pour train, ferry, vélo et marche.

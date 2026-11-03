@@ -236,4 +236,17 @@ describe("v5 : modes de déplacement et tronçons", () => {
     } as unknown as Partial<TripSnapshot>);
     expect(migrated.legs[0]).toMatchObject({ mode: "train", track: "aucun", manual: { durationSec: 3600 } });
   });
+
+  it("garde le prix d'un tronçon manuel s'il est complet, l'écarte sinon", () => {
+    const leg = { id: "l5", fromStopId: "s1", toStopId: "s2", dayIndex: 0, mode: "train", track: "aucun", options: [] };
+    const migrated = migrateSnapshot({
+      ...v1,
+      legs: [
+        { ...leg, manual: { durationSec: 3600, price: { amount: 42.5, currency: "NOK" } } },
+        { ...leg, id: "l6", manual: { durationSec: 3600, price: { amount: "42" } } },
+      ],
+    } as unknown as Partial<TripSnapshot>);
+    expect(migrated.legs[0].manual?.price).toEqual({ amount: 42.5, currency: "NOK" });
+    expect(migrated.legs[1].manual).toEqual({ durationSec: 3600 });
+  });
 });

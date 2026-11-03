@@ -1,5 +1,6 @@
 import type { LngLatBounds, Map as MapLibreMap } from "maplibre-gl";
-import { selectedOption, type TripState } from "@/store/trip-store";
+import { legCoordinates } from "@/lib/legs";
+import type { TripState } from "@/store/trip-store";
 
 const CLUTTER_LAYERS = [
   "towns-circle",
@@ -70,9 +71,7 @@ function tripBounds(
     any = true;
   }
   for (const leg of state.legs) {
-    const opt = selectedOption(leg);
-    if (!opt) continue;
-    for (const coord of opt.geometry.coordinates) {
+    for (const coord of legCoordinates(leg, state.stops)) {
       bounds.extend([coord[0], coord[1]]);
       any = true;
     }

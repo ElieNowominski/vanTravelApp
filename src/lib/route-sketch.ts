@@ -1,4 +1,5 @@
-import type { Leg, RouteOption, Stop, TripSnapshot } from "@/lib/types";
+import { legCoordinates } from "@/lib/legs";
+import type { Stop, TripSnapshot } from "@/lib/types";
 
 /**
  * Croquis d'itinéraire d'un jour en SVG, sans fond de carte : tracés stockés et étapes projetés
@@ -17,10 +18,6 @@ export type RouteSketch = {
   spanKm: number;
 };
 
-function selected(leg: Leg): RouteOption | null {
-  return leg.options[leg.selectedIndex] ?? leg.options[0] ?? null;
-}
-
 export function sketchDay(
   snapshot: Pick<TripSnapshot, "days" | "stops" | "legs">,
   dayIndex: number,
@@ -34,7 +31,8 @@ export function sketchDay(
 
   const legs = snapshot.legs.filter((leg) => leg.dayIndex === dayIndex);
   const stops = day.stopIds.map((id) => snapshot.stops[id]).filter((s): s is Stop => Boolean(s));
-  const lines = legs.map((leg) => ({ coords: selected(leg)?.geometry.coordinates ?? [], estimated: leg.estimated }));
+  // Pointillé pour une route estimée comme pour un tronçon sans tracé (ligne droite entre les étapes).
+  const lines = legs.map((leg) => ({ coords: legCoordinates(leg, snapshot.stops), estimated: leg.estimated || leg.track === "aucun" }));
   // Le point de départ du premier tronçon (nuit précédente) fait partie du dessin.
   const fromIds = legs.map((leg) => leg.fromStopId);
   const extraStops = fromIds

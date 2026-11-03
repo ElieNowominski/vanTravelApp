@@ -25,14 +25,16 @@ import { SyncStatusButton } from "@/components/account/sync-status-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TripLibraryButton } from "@/components/trip-library-dialog";
 import { TripMarksEditor } from "@/components/trip-marks-editor";
+import { LegEditor } from "@/components/leg-editor";
 import { StopActivitiesEditor } from "@/components/stop-activities-editor";
 import { buildCatalog, catalogOption, searchCatalog } from "@/lib/catalog";
 import { searchBias } from "@/lib/place-search";
 import { captureTripMapImage } from "@/lib/capture-map";
 import { START_STOP_ID, dayColor } from "@/lib/constants";
 import { useTripZone } from "@/hooks/use-trip-zone";
-import { legDistanceKm, legDurationSec } from "@/lib/legs";
-import { DEFAULT_PROFILE, TRAVEL_MODE_LABELS } from "@/lib/profiles";
+import { allExpenses, defaultExpenseCurrency } from "@/lib/expenses";
+import { legSummary } from "@/lib/legs";
+import { DEFAULT_PROFILE } from "@/lib/profiles";
 import { getActiveMap } from "@/lib/map-registry";
 import { exportTripPdf } from "@/lib/export-pdf";
 import { formatDateRange, formatDayDrive, formatDuration, formatKm, formatShortDay } from "@/lib/format";
@@ -73,6 +75,8 @@ export function ItineraryPanel() {
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [marksOpen, setMarksOpen] = useState(false);
   const [openStopId, setOpenStopId] = useState<string | null>(null);
+  const [openLegId, setOpenLegId] = useState<string | null>(null);
+  const currency = useMemo(() => defaultExpenseCurrency(allExpenses(days)), [days]);
   const localResults = useCallback((query: string) => searchCatalog(catalog, query).map(catalogOption), [catalog]);
   const bias = useMemo(() => searchBias({ days, stops }, currentDayIndex, config?.start), [days, stops, currentDayIndex, config]);
   const plusCount = marks.filter((mark) => mark.kind === "plus").length;
@@ -123,7 +127,7 @@ export function ItineraryPanel() {
             </Badge>
           )}
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           <Button
             variant={pinMode ? "default" : "outline"}
             size="sm"
@@ -242,7 +246,7 @@ export function ItineraryPanel() {
           {days.map((day, index) => {
             const stats = dayStats({ days, stops, legs }, index);
             const active = index === currentDayIndex;
-            const tooLong = stats.driveSec / 3600 > vehicle.maxComfortableDriveHours;
+            const tooLong = stats.roadSec / 3600 > vehicle.maxComfortableDriveHours;
             const lastId = day.stopIds[day.stopIds.length - 1];
             const color = dayColor(index);
             return (
@@ -314,17 +318,26 @@ export function ItineraryPanel() {
                     return (
                       <li key={stopId} className="px-2 py-1.5">
                         {inbound && (option || inbound.track === "aucun") && (
-                          <p className="mb-1 pl-5 text-[11px] text-muted-foreground">
-                            {stops[inbound.fromStopId]?.name ?? "Départ"} → {stop.name}
-                            {inbound.track === "aucun" ? ` · ${TRAVEL_MODE_LABELS[inbound.mode]}` : ""}
-                            {" · "}
-                            {formatDuration(legDurationSec(inbound))}
-                            {option?.winding ? " · route lente" : ""} · {formatKm(legDistanceKm(inbound))}
-                            {inbound.estimated ? " · estimé" : ""}
-                            {inbound.options.length > 1
-                              ? ` · ${inbound.options.length} routes`
-                              : ""}
-                          </p>
+                          <>
+                            <button
+                              type="button"
+                              className="mb-1 w-full rounded-md py-0.5 pl-5 text-left text-[11px] text-muted-foreground hover:bg-muted/60"
+                              aria-expanded={openLegId === inbound.id}
+                              title="Changer le mode ou l’horaire de ce tronçon"
+                              onClick={() => setOpenLegId((id) => (id === inbound.id ? null : inbound.id))}
+                            >
+                              {stops[inbound.fromStopId]?.name ?? "Départ"} → {stop.name} · {legSummary(inbound)}
+                              {inbound.track === "aucun" && inbound.manual?.operator ? ` · ${inbound.manual.operator}` : ""}
+                              {inbound.options.length > 1 ? ` · ${inbound.options.length} routes` : ""}
+                              <ChevronDown
+                                className={cn("ml-1 inline size-3 transition-transform", openLegId === inbound.id && "rotate-180")}
+                                aria-hidden
+                              />
+                            </button>
+                            {openLegId === inbound.id && (
+                              <LegEditor leg={inbound} defaultCurrency={currency} onDone={() => setOpenLegId(null)} />
+                            )}
+                          </>
                         )}
                         <div className="flex items-start gap-2">
                           <span

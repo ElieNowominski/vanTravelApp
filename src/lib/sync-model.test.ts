@@ -165,6 +165,12 @@ describe("itinéraire", () => {
     const moved = snapshot();
     moved.days[1].stopIds = ["s3"];
     expect(itinerarySignature(moved)).not.toBe(sig);
+    const ferry = snapshot();
+    ferry.legs[0] = { ...ferry.legs[0], mode: "ferry", track: "aucun", manual: { durationSec: 3600 } };
+    expect(itinerarySignature(ferry)).not.toBe(sig);
+    const timed = snapshot();
+    timed.legs[0] = { ...ferry.legs[0], manual: { durationSec: 3600, departAt: "8 h" } };
+    expect(itinerarySignature(timed)).not.toBe(itinerarySignature(ferry));
   });
 
   it("applyItinerary garde les réservations locales des étapes connues", () => {

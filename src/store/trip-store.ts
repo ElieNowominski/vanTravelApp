@@ -4,9 +4,9 @@ import { idbStorage } from "@/lib/idb-storage";
 import { buildCatalog, findCatalogPlace, placeToInput } from "@/lib/catalog";
 import { START_STOP_ID, STORAGE_KEY } from "@/lib/constants";
 import { eachDateInclusive, formatDayLabel } from "@/lib/format";
-import { freezeSnapshot } from "@/lib/freeze";
+import { freezeLeg, freezeSnapshot } from "@/lib/freeze";
 import { newId } from "@/lib/geo";
-import { legDistanceKm, legDurationSec, selectedOption } from "@/lib/legs";
+import { applyManualInput, legDistanceKm, legDurationSec, roadDurationSec, selectedOption, type ManualLegInput } from "@/lib/legs";
 import {
   SNAPSHOT_SCHEMA_VERSION,
   normalizeDays,
@@ -15,7 +15,7 @@ import {
   normalizeStops,
   normalizeTombstones,
 } from "@/lib/migrations";
-import { DEFAULT_PROFILE, isRoadMode } from "@/lib/profiles";
+import { DEFAULT_PROFILE, isRoadMode, TRAVEL_MODE_LABELS } from "@/lib/profiles";
 import { createTravelSlice, type TravelSlice } from "@/store/travel-slice";
 import { configFromSnapshot, normalizeTripConfig, tripDates } from "@/lib/trip-config";
 import { normalizeMarks } from "@/lib/trip-marks";
@@ -34,7 +34,7 @@ import type {
   TravelProfile,
   TripSnapshot,
 } from "@/lib/types";
-import { routeBetween } from "@/services/routing";
+import { routeLeg } from "@/services/routing";
 
 export type SyncPatch = Partial<
   Pick<
@@ -78,6 +78,10 @@ export type TripState = TravelSlice & {
   unlockDay: (dayIndex: number) => void;
   setCurrentDay: (index: number) => void;
   selectAlternative: (legId: string, index: number) => void;
+  /** Change le mode d'un tronçon : recalcule la route (van, voiture, moto) ou passe en saisie manuelle. */
+  setLegMode: (legId: string, mode: TravelMode) => Promise<void>;
+  /** Enregistre l'horaire, la durée, la distance, la compagnie et le prix d'un tronçon sans tracé. */
+  updateLegManual: (legId: string, input: ManualLegInput) => void;
   dismissAlternatives: () => void;
   addCustomPin: (pin: PlaceInput, addToItinerary: boolean) => Promise<void>;
   removeCustomPin: (placeId: string) => void;
@@ -201,25 +205,12 @@ function sameCalendar(days: TripDay[], config: TripConfig): boolean {
   return days.length === dates.length && days.every((day, i) => day.date === dates[i]);
 }
 
-/**
- * Tronçon neuf, dans le mode par défaut du voyage. Un mode non routier (train, ferry) est encore calculé par
- * la route en attendant la saisie manuelle (lot 4) : la durée affichée reste une estimation routière.
- */
+/** Tronçon neuf, dans le mode par défaut du voyage (train ou ferry : sans tracé, durée estimée à corriger). */
 async function buildLeg(from: Stop, to: Stop, dayIndex: number, config: TripConfig | null): Promise<Leg> {
   const profile: TravelProfile = config?.profile ?? DEFAULT_PROFILE;
   const mode: TravelMode = config?.defaultMode ?? profile.mode;
-  const result = await routeBetween(from, to, profile);
-  return {
-    id: newId("leg"),
-    fromStopId: from.id,
-    toStopId: to.id,
-    dayIndex,
-    mode: isRoadMode(mode) ? mode : profile.mode,
-    track: "calcule",
-    options: result.options,
-    selectedIndex: 0,
-    estimated: result.estimated,
-  };
+  const { leg } = await routeLeg(from, to, mode, profile);
+  return { id: newId("leg"), fromStopId: from.id, toStopId: to.id, dayIndex, ...leg };
 }
 
 export const useTripStore = create<TripState>()(
@@ -419,6 +410,54 @@ export const useTripStore = create<TripState>()(
       },
 
       dismissAlternatives: () => set({ pendingLegId: null }),
+
+      setLegMode: async (legId, mode) => {
+        const leg = get().legs.find((l) => l.id === legId);
+        if (!leg || leg.mode === mode) return;
+        const replace = (next: Leg) =>
+          set((prev) => ({
+            legs: prev.legs.map((l) => (l.id === legId ? (prev.frozenAt ? freezeLeg(next) : next) : l)),
+          }));
+        // Van, voiture, moto : même route, seuls le libellé et le profil changent (un profil par voyage).
+        if (isRoadMode(leg.mode) && isRoadMode(mode) && leg.track !== "aucun") {
+          replace({ ...leg, mode });
+          return;
+        }
+        // Entre deux modes manuels, l'horaire saisi reste ; seule une estimation est refaite.
+        if (!isRoadMode(leg.mode) && !isRoadMode(mode) && leg.manual && !leg.estimated) {
+          replace({ ...leg, mode });
+          return;
+        }
+        const from = get().stops[leg.fromStopId];
+        const to = get().stops[leg.toStopId];
+        if (!from || !to) return;
+        const road = isRoadMode(mode);
+        if (road) set({ routingStatus: "loading", routingMessage: `Calcul de la route vers ${to.name}…` });
+        try {
+          const { leg: routing } = await routeLeg(from, to, mode, get().config?.profile ?? DEFAULT_PROFILE);
+          const current = get().legs.find((l) => l.id === legId);
+          if (!current) return;
+          // Un horaire déjà saisi survit au passage par un mode routier puis retour.
+          const manual = routing.track === "aucun" && current.manual && !current.estimated ? current.manual : routing.manual;
+          const next: Leg = { ...current, ...routing, estimated: manual === routing.manual ? routing.estimated : false };
+          if (manual) next.manual = manual;
+          else delete next.manual;
+          replace(next);
+          set({
+            routingStatus: "idle",
+            routingMessage: road && routing.estimated ? "Route estimée (réseau routier indisponible)." : null,
+            pendingLegId: road && routing.options.length > 1 && !get().frozenAt ? legId : null,
+          });
+        } catch {
+          set({ routingStatus: "error", routingMessage: `Passage en ${TRAVEL_MODE_LABELS[mode].toLowerCase()} impossible.` });
+        }
+      },
+
+      updateLegManual: (legId, input) => {
+        set((prev) => ({
+          legs: prev.legs.map((l) => (l.id === legId && l.track === "aucun" ? applyManualInput(l, input) : l)),
+        }));
+      },
 
       addCustomPin: async (pin, addToItinerary) => {
         set((prev) => ({
@@ -650,5 +689,7 @@ export function dayStats(state: { days: TripDay[]; stops: Record<string, Stop>; 
   const driveSec = dayLegs.reduce((sum, l) => sum + legDurationSec(l), 0);
   const km = dayLegs.reduce((sum, l) => sum + legDistanceKm(l), 0);
   const overnight = day?.overnightStopId ? state.stops[day.overnightStopId] : null;
-  return { driveSec, km, overnight, stopCount: day?.stopIds.length ?? 0 };
+  /** Temps au volant seul, pour le seuil de confort du profil. */
+  const roadSec = roadDurationSec(dayLegs);
+  return { driveSec, roadSec, km, overnight, stopCount: day?.stopIds.length ?? 0 };
 }

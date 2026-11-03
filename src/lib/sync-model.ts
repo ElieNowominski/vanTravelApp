@@ -295,7 +295,7 @@ export function itinerarySignature(snapshot: TripSnapshot): string {
   const stops = Object.values(snapshot.stops)
     .map((s) => [s.id, s.placeId, s.name, s.lng, s.lat, s.kind, s.isOvernight ? 1 : 0, s.activities.map((a) => a.text), s.notesAt ? "" : s.notes ?? ""])
     .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
-  const legs = snapshot.legs.map((l) => [l.id, l.fromStopId, l.toStopId, l.selectedIndex, l.options.length]).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+  const legs = snapshot.legs.map((l) => [l.id, l.fromStopId, l.toStopId, l.selectedIndex, l.options.length, l.mode, l.track, l.manual ?? null]).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
   const pins = snapshot.customPins.map((p) => [p.placeId, p.name, p.lng, p.lat]).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
   return hashString(JSON.stringify([days, stops, legs, pins, snapshot.frozenAt ?? null]));
 }

@@ -10,6 +10,7 @@ import type {
   ExpenseCategory,
   Leg,
   ManualLeg,
+  Money,
   RouteOption,
   Stop,
   TripDay,
@@ -30,7 +31,7 @@ import type {
  * 4 : navigation Voyager. Document d'étape += `scope` (« nuit » si l'étape est une nuit, sinon « activite »,
  *     quand il manque) ; dépense += `stopId` (optionnel) ; snapshot += `tripDocuments` (documents hors étape).
  * 5 : v2, modes de déplacement (ADR 0002). Tronçon += `mode` (« van » quand il manque : la v1 ne connaissait
- *     que le van), `track`, `manual` (tronçon sans tracé) ; option de route : `durationCarSec` devient
+ *     que le van), `track`, `manual` (tronçon sans tracé ; `price` ajouté au lot 4, optionnel) ; option de route : `durationCarSec` devient
  *     `durationRawSec`, `durationVanSec` devient `durationSec`.
  *
  * La migration est idempotente : on peut la passer sur des données déjà à jour.
@@ -69,15 +70,19 @@ export function normalizeMeta(raw: Record<string, unknown>, prefix: string): Ent
   };
 }
 
+function normalizeMoney(value: unknown): Money | undefined {
+  return isRecord(value) && num(value.amount) != null && str(value.currency)
+    ? { amount: num(value.amount) as number, currency: str(value.currency) as string }
+    : undefined;
+}
+
 export function normalizeBookings(value: unknown): Booking[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item): Booking[] => {
     if (!isRecord(item)) return [];
     const provider = str(item.provider);
     if (!provider) return [];
-    const price = isRecord(item.price) && num(item.price.amount) != null && str(item.price.currency)
-      ? { amount: num(item.price.amount) as number, currency: str(item.price.currency) as string }
-      : undefined;
+    const price = normalizeMoney(item.price);
     return [
       {
         ...normalizeMeta(item, "booking"),
@@ -197,6 +202,7 @@ function normalizeManualLeg(value: unknown): ManualLeg | undefined {
     departAt: str(value.departAt),
     arriveAt: str(value.arriveAt),
     operator: str(value.operator),
+    price: normalizeMoney(value.price),
     notes: str(value.notes),
   };
   return Object.fromEntries(Object.entries(manual).filter(([, v]) => v !== undefined)) as ManualLeg;

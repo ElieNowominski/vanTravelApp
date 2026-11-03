@@ -9,8 +9,8 @@ import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { useTripBoot } from "@/hooks/use-trip-boot";
 import { dayColor } from "@/lib/constants";
 import { useTripZone } from "@/hooks/use-trip-zone";
-import { legDistanceKm, legDurationSec } from "@/lib/legs";
-import { DEFAULT_PROFILE, TRAVEL_MODE_LABELS } from "@/lib/profiles";
+import { legSummary } from "@/lib/legs";
+import { DEFAULT_PROFILE } from "@/lib/profiles";
 import { printNeedsBrowser } from "@/lib/pwa";
 import { formatMoney, formatTotals, totalsByCurrency } from "@/lib/expenses";
 import { formatDateRange, formatDayDrive, formatDuration, formatKm, isRestDay } from "@/lib/format";
@@ -169,10 +169,12 @@ export function RoadbookPage() {
                         <li key={stop.id} className="text-sm">
                           {inbound && (option || inbound.track === "aucun") && (
                             <p className="text-xs text-muted-foreground">
-                              {stops[inbound.fromStopId]?.name ?? "Départ"} → {stop.name}
-                              {inbound.track === "aucun" ? ` · ${TRAVEL_MODE_LABELS[inbound.mode]}` : ""} · {formatKm(legDistanceKm(inbound))} ·{" "}
-                              {formatDuration(legDurationSec(inbound))}
-                              {option?.winding ? " · route lente" : ""}
+                              {stops[inbound.fromStopId]?.name ?? "Départ"} → {stop.name} · {legSummary(inbound)}
+                              {inbound.track === "aucun" && inbound.manual?.operator ? ` · ${inbound.manual.operator}` : ""}
+                              {inbound.track === "aucun" && inbound.manual?.price
+                                ? ` · ${formatMoney(inbound.manual.price.amount, inbound.manual.price.currency)}`
+                                : ""}
+                              {inbound.track === "aucun" && inbound.manual?.notes ? ` · ${inbound.manual.notes}` : ""}
                             </p>
                           )}
                           <p>

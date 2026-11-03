@@ -137,6 +137,8 @@ export type ManualLeg = {
   arriveAt?: string;
   /** Compagnie, numéro de train ou de traversée. */
   operator?: string;
+  /** Prix du billet, pour mémoire : il n'entre pas dans les dépenses. */
+  price?: Money;
   notes?: string;
 };
 

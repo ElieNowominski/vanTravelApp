@@ -18,7 +18,8 @@ import { absoluteAssetUrl } from "@/lib/base-url";
 import { initialMapView, tripPoints } from "@/lib/zone";
 import { loadDataset } from "@/services/datasets";
 import type { CatalogPlace, LayersState, PlaceInput, PlaceKind } from "@/lib/types";
-import { selectedOption, useTripStore } from "@/store/trip-store";
+import { legCoordinates } from "@/lib/legs";
+import { useTripStore } from "@/store/trip-store";
 import { AlternativesCard } from "@/components/alternatives-card";
 import { CustomPinDialog } from "@/components/custom-pin-dialog";
 import { DatasetNotice, type DatasetProblem } from "@/components/dataset-notice";
@@ -95,12 +96,13 @@ function syncItinerary(map: MapLibreMap) {
       });
     }
     for (const leg of state.legs.filter((l) => l.dayIndex === dayIndex)) {
-      const option = selectedOption(leg);
-      if (!option) continue;
+      const coordinates = legCoordinates(leg, state.stops);
+      if (coordinates.length < 2) continue;
       lineFeatures.push({
         type: "Feature",
-        geometry: option.geometry,
-        properties: { color, estimated: leg.estimated, dayIndex },
+        geometry: { type: "LineString", coordinates },
+        // Sans tracé (train, ferry) : ligne droite en pointillé entre les deux étapes.
+        properties: { color, estimated: leg.estimated, dayIndex, untracked: leg.track === "aucun" },
       });
     }
   });
@@ -467,7 +469,7 @@ export function TripMap() {
       <AlternativesCard />
       {routingStatus !== "idle" || routingMessage ? (
         <div className="pointer-events-none absolute top-3 left-1/2 z-10 max-w-sm -translate-x-1/2 rounded-full bg-background/95 px-3 py-1.5 text-center text-xs shadow ring-1 ring-foreground/10">
-          {routingStatus === "loading" ? "Calcul de la route van…" : routingMessage}
+          {routingStatus === "loading" ? "Calcul de la route…" : routingMessage}
         </div>
       ) : null}
       <CustomPinDialog
@@ -709,11 +711,25 @@ function addItineraryLayers(map: MapLibreMap) {
     id: "itinerary-lines",
     type: "line",
     source: "itinerary-lines",
+    filter: ["!=", ["get", "untracked"], true],
     layout: { "line-cap": "round", "line-join": "round" },
     paint: {
       "line-color": ["coalesce", ["get", "color"], "#0f766e"],
       "line-width": 4.5,
       "line-opacity": 0.9,
+    },
+  });
+  map.addLayer({
+    id: "itinerary-lines-untracked",
+    type: "line",
+    source: "itinerary-lines",
+    filter: ["==", ["get", "untracked"], true],
+    layout: { "line-join": "round" },
+    paint: {
+      "line-color": ["coalesce", ["get", "color"], "#0f766e"],
+      "line-width": 3,
+      "line-opacity": 0.85,
+      "line-dasharray": [2, 1.5],
     },
   });
   map.addLayer({
