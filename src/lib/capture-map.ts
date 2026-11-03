@@ -13,6 +13,8 @@ const CLUTTER_LAYERS = [
   "osm-camps-circle",
   "osm-camps-cluster",
   "osm-camps-cluster-count",
+  "osm-pois-circle",
+  "osm-pois-label",
   "freedom-fill",
   "freedom-line",
   "custom-circle",
