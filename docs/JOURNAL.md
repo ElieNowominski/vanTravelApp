@@ -153,3 +153,23 @@ Les entrées antérieures au 7 octobre 2026 sont reconstituées après coup depu
   - Valeurs de départ (500 et 2 000 pour la recherche de lieux, 200 et 1 000 pour les points d'intérêt) choisies par l'assistant, à confronter aux règles d'usage aux lots 3 et 5.
   - Droits explicites plutôt que l'option « Automatically expose new tables » : une table oubliée n'est plus exposée par défaut.
 - **Chiffres** : `rls-check` 72/72 (37 avant) ; 152 tests en 23 fichiers (141 avant) ; une migration de 225 lignes.
+
+## 2026-11-03 : v2, lot 3 (géographie libre)
+
+- **Intention** : pouvoir poser une étape ou un départ n'importe où, sans catalogue ni région, et ne plus montrer hors de Nouvelle-Zélande ce qui ne sert qu'à elle.
+- **Demandes** : « Go lot 3 de la v2 ».
+- **Livré** : recherche de lieux sur OSM par Photon (`src/lib/place-search.ts` pur, `src/services/place-search.ts`, `usePlaceSearch`, `PlaceSearchField`), branchée dans le panneau Planifier (catalogue local puis OSM) et dans l'écran de démarrage à la place de la liste des villes néo-zélandaises ; appui long et clic droit sur la carte (`map-long-press.ts`) avec un nom proposé par recherche inversée ; plus de région par défaut sans voyage ; campings OSM générés pour la NZ et interrupteurs du catalogue masqués ailleurs ; deux fichiers de test (21 tests), dont le premier test d'un service réseau du dépôt (compteur et `fetch` simulés).
+- **Cassé ou appris** :
+  - La politique du serveur public de Photon tient en une phrase (« limite raisonnable », usage intensif ralenti ou banni), sans chiffre : impossible de confronter le plafond de 500 recherches par compte et par jour à une limite publiée. Vérifié aussi par une requête : CORS ouvert, `lang=fr` accepté, `extent` dans l'ordre ouest, nord, est, sud.
+  - Premier essai de recherche inversée dans le navigateur : rien de proposé. Le point cliqué était en mer, Photon ne renvoie alors rien ; le dialogue garde son exemple, comportement voulu, mais l'assistant a d'abord cru à un défaut.
+  - Le plugin `react-hooks` 7 refuse un `setState` synchrone dans un effet : le crochet de recherche range la réponse sous la clé de la recherche qui l'a demandée et dérive « en cours » de l'écart entre cette clé et la saisie. Les résultats précédents ne restent affichés que si l'on complète la même recherche, sinon la liste montrait des lieux d'une recherche sans rapport.
+  - Les tests tournent sous Node : `window.setTimeout` dans un service le rendait intestable ; `setTimeout` suffit. `AbortSignal.any` écarté (absent des Safari d'iOS avant 17.4).
+  - L'assistant a écrit un script jetable dans le dossier parent du dépôt au lieu du brouillon de session, puis l'a supprimé.
+  - Les identifiants des comptes de test vivent dans des variables d'environnement, pas dans le dépôt : le plafond n'a pas été vu en action avec un vrai compte, seulement par les tests du service.
+- **Décisions** :
+  - Photon plutôt que Nominatim : le Nominatim public interdit l'autocomplétion pendant la frappe.
+  - Le plafond ne s'applique qu'à un compte connecté et un compteur muet ne bloque pas la recherche : sans compte, rien à compter ; et le plafond est un garde-fou, la protection de fond reste l'attente de fin de frappe, le cache et l'écart d'une seconde.
+  - Le champ de recherche remplace l'ancien sans maquette, à titre provisoire : la règle « maquette avant le code » vise les écrans nouveaux, et la recherche de lieux a sa maquette au lot 6.
+  - Un lieu OSM garde un identifiant stable `osm:<type><id>` et `meta.source` ; aucun changement de schéma stocké.
+  - Le départ ne garde pas la localisation du lieu (le repère n'a pas de champ `area`) : ajouter ce champ touche la forme du voyage, reporté à l'écran de création.
+- **Chiffres** : 173 tests en 25 fichiers (152 avant) ; une requête Photon pour un mot de douze lettres tapé d'un trait ; réponses de Photon entre 2 et 3,5 s pendant les essais.

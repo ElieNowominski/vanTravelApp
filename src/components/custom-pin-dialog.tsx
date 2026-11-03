@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { CUSTOM_CATEGORIES } from "@/lib/constants";
 import { newId } from "@/lib/geo";
+import type { PlaceResult } from "@/lib/place-search";
+import { reversePlace } from "@/services/place-search";
 import { useTripStore } from "@/store/trip-store";
 
 export function CustomPinDialog({
@@ -33,8 +35,27 @@ export function CustomPinDialog({
   const [category, setCategory] = useState("activite");
   const [notes, setNotes] = useState("");
   const [addToItinerary, setAddToItinerary] = useState(true);
+  const [nearest, setNearest] = useState<{ at: string; place: PlaceResult } | null>(null);
+  const at = lng != null && lat != null ? `${lng},${lat}` : "";
+  const suggestion = nearest && nearest.at === at ? nearest.place : null;
 
-  const canSave = Boolean(name.trim() && lng != null && lat != null);
+  // Lieu OSM le plus proche (Photon) : proposé comme nom, la localisation sert de sous-titre à l'étape.
+  useEffect(() => {
+    if (!open || lng == null || lat == null) return;
+    const controller = new AbortController();
+    reversePlace({ lng, lat }, controller.signal)
+      .then((outcome) => {
+        const place = outcome.status === "ok" ? outcome.results[0] : undefined;
+        if (place) setNearest({ at: `${lng},${lat}`, place });
+      })
+      .catch(() => {
+        /* dialogue fermé avant la réponse */
+      });
+    return () => controller.abort();
+  }, [open, lng, lat]);
+
+  const finalName = name.trim() || suggestion?.name || "";
+  const canSave = Boolean(finalName && lng != null && lat != null);
 
   const reset = () => {
     setName("");
@@ -55,11 +76,12 @@ export function CustomPinDialog({
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nouveau point d’attention</DialogTitle>
+          <DialogTitle>Nouveau lieu</DialogTitle>
           <DialogDescription>
             {lng != null && lat != null
               ? `${lat.toFixed(4)}°, ${lng.toFixed(4)}°`
               : "Clique sur la carte pour poser le pin."}
+            {suggestion?.area ? ` · ${suggestion.area}` : ""}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
@@ -69,14 +91,15 @@ export function CustomPinDialog({
               id="pin-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex. rando Blue Pools au lever du soleil"
+              placeholder={suggestion?.name ?? "Ex. aire de pique-nique au bord du lac"}
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="pin-cat">Type</Label>
             <select
               id="pin-cat"
-              className="h-8 rounded-lg border border-input bg-background px-2.5 text-sm"
+              // 16 px minimum : en dessous, iOS zoome la page au focus.
+              className="h-11 rounded-lg border border-input bg-background px-2.5 text-base md:h-8 md:text-sm"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -116,12 +139,13 @@ export function CustomPinDialog({
               await addCustomPin(
                 {
                   placeId: newId("custom"),
-                  name: name.trim(),
+                  name: finalName,
                   lng,
                   lat,
                   kind: "custom",
                   notes: notes.trim() || undefined,
-                  meta: { category },
+                  ...(suggestion?.area ? { area: suggestion.area } : {}),
+                  meta: { category, ...(suggestion && !name.trim() ? { source: "osm" } : {}) },
                 },
                 addToItinerary,
               );

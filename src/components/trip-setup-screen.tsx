@@ -1,17 +1,20 @@
-import { useMemo, useRef, useState } from "react";
-import { Cloud, FolderOpen, MapPinned, Upload } from "lucide-react";
+import { useRef, useState } from "react";
+import { Cloud, FolderOpen, MapPinned, Upload, X } from "lucide-react";
 import { SyncStatusButton } from "@/components/account/sync-status-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PlaceSearchField } from "@/components/place-search-field";
 import { parseBackup, restoreBackup } from "@/lib/backup";
-import { buildCatalog, findCatalogPlace } from "@/lib/catalog";
+import { catalogOption, searchPublicCatalogs } from "@/lib/catalog";
 import { profileFromPreset } from "@/lib/profiles";
-import { DEFAULT_REGION_ID, getRegion } from "@/lib/regions";
 import { slugify } from "@/lib/trip-config";
 import { listSavedTrips } from "@/lib/trip-library";
-import type { SavedTrip, TripConfig } from "@/lib/types";
+import type { PlaceInput, SavedTrip, TripConfig } from "@/lib/types";
+
+/** Tous les catalogues publics, hors ligne ; Photon complète pendant la frappe. */
+const localStartPlaces = (query: string) => searchPublicCatalogs(query).map(catalogOption);
 import { useTripStore } from "@/store/trip-store";
 
 /**
@@ -26,12 +29,10 @@ export function TripSetupScreen() {
   const [library, setLibrary] = useState<SavedTrip[] | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const region = getRegion(DEFAULT_REGION_ID);
-  const catalog = useMemo(() => buildCatalog(null), []);
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [startPlaceId, setStartPlaceId] = useState(catalog.towns[0]?.id ?? "");
+  const [startPlace, setStartPlace] = useState<PlaceInput | null>(null);
 
   const importFile = async (file: File) => {
     setBusy(true);
@@ -67,15 +68,16 @@ export function TripSetupScreen() {
     if (!trimmed) return setStatus("Donne un nom au voyage.");
     if (!startDate || !endDate) return setStatus("Renseigne les deux dates.");
     if (endDate < startDate) return setStatus("La fin précède le début.");
-    const place = findCatalogPlace(catalog, startPlaceId);
+    const place = startPlace;
     if (!place) return setStatus("Choisis un point de départ.");
+    const milestone = { placeId: place.placeId, name: place.name, lng: place.lng, lat: place.lat };
     const config: TripConfig = {
       id: `trip-${slugify(trimmed)}-${startDate}`,
       schemaVersion: 2,
       name: trimmed,
       defaultMode: "van",
-      start: { placeId: place.id, name: place.name, lng: place.lng, lat: place.lat, date: startDate },
-      end: { placeId: place.id, name: place.name, lng: place.lng, lat: place.lat, date: endDate },
+      start: { ...milestone, date: startDate },
+      end: { ...milestone, date: endDate },
       profile: profileFromPreset("van"),
       stays: [],
       plan: { days: [] },
@@ -181,7 +183,7 @@ export function TripSetupScreen() {
             <MapPinned className="size-4" />
             Nouveau voyage
           </CardTitle>
-          <CardDescription>{region.name}. Le véhicule et les hébergements se règlent ensuite.</CardDescription>
+          <CardDescription>N’importe où : le départ suffit, le profil de déplacement et les hébergements se règlent ensuite.</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
@@ -190,7 +192,7 @@ export function TripSetupScreen() {
               id="trip-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex. Île du Sud 2027"
+              placeholder="Ex. Fjords en van 2027"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -210,19 +212,19 @@ export function TripSetupScreen() {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="trip-start-place">Départ</Label>
-            <select
-              id="trip-start-place"
-              value={startPlaceId}
-              onChange={(e) => setStartPlaceId(e.target.value)}
-              // 16 px minimum : en dessous, iOS zoome la page au focus et ne revient pas toujours.
-              className="h-11 rounded-lg border border-input bg-background px-3 text-base"
-            >
-              {catalog.towns.map((town) => (
-                <option key={town.id} value={town.id}>
-                  {town.name}
-                </option>
-              ))}
-            </select>
+            {startPlace ? (
+              <div className="flex min-h-11 items-center justify-between gap-2 rounded-lg border px-3 py-1.5">
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium">{startPlace.name}</span>
+                  {startPlace.area && <span className="block truncate text-xs text-muted-foreground">{startPlace.area}</span>}
+                </span>
+                <Button variant="ghost" size="icon" className="size-11 shrink-0" aria-label="Changer de départ" onClick={() => setStartPlace(null)}>
+                  <X className="size-4" />
+                </Button>
+              </div>
+            ) : (
+              <PlaceSearchField id="trip-start-place" placeholder="Ville, gare, camping…" local={localStartPlaces} actionLabel="Choisir" onSelect={setStartPlace} />
+            )}
           </div>
           <Button className="h-11 w-full sm:w-fit" onClick={createTrip}>
             Créer le voyage

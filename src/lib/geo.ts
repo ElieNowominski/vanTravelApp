@@ -34,10 +34,6 @@ export function newId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function inSouthIsland(lng: number, lat: number): boolean {
-  return lng >= 166 && lng <= 175.2 && lat <= -40.3 && lat >= -47.5;
-}
-
 function centroidOf(coords: number[][] | number[][][]): [number, number] | null {
   const ring = Array.isArray(coords[0]?.[0])
     ? (coords[0] as number[][])

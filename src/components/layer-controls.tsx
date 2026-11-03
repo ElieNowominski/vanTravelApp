@@ -5,8 +5,11 @@ import { Label } from "@/components/ui/label";
 import { useTripStore } from "@/store/trip-store";
 import type { LayerKey } from "@/lib/types";
 
-/** Calques propres à la Nouvelle-Zélande (DOC), masqués quand le voyage n'y passe pas. */
-const NZ_ONLY: LayerKey[] = ["camps", "freedom"];
+/**
+ * Calques propres à la Nouvelle-Zélande, masqués quand le voyage n'y passe pas : catalogue (villes et spots),
+ * DOC, et les campings OSM générés au build sur son cadre (les points d'intérêt OSM ailleurs viendront au lot 5).
+ */
+const NZ_ONLY: LayerKey[] = ["towns", "pois", "camps", "osmCamps", "freedom"];
 
 const ITEMS: Array<{ key: LayerKey; label: string; hint: string }> = [
   { key: "towns", label: "Villes", hint: "Cliquables" },
@@ -59,7 +62,7 @@ export function LayerControls({
           {nzSources && layers.camps && campsLoading && (
             <p className="text-xs text-muted-foreground">Chargement des campings DOC…</p>
           )}
-          {layers.osmCamps && osmCampsLoading && (
+          {nzSources && layers.osmCamps && osmCampsLoading && (
             <p className="text-xs text-muted-foreground">Chargement holiday parks / OSM…</p>
           )}
         </div>

@@ -20,7 +20,7 @@ Prompt de reprise :
 - [x] Lot 0 : préversion locale et projet Supabase dédié (3 nov. 2026 : port 43218, `.env.next.local`, projet `vanTravelApp-v2`, `rls-check` 37/37)
 - [x] Lot 1 : modèle v5 et voyage fictif de référence (3 nov. 2026 : 141 tests, parcours vérifié dans le navigateur)
 - [x] Lot 2 : schéma Supabase (rôles, plafonds)
-- [ ] Lot 3 : géographie libre (recherche de lieux, fin de la région unique)
+- [x] Lot 3 : géographie libre (3 nov. 2026 : recherche Photon, appui long, plus de région par défaut ; 173 tests, parcours vérifié dans le navigateur)
 - [ ] Lot 4 : routage par tronçon
 - [ ] Lot 5 : points d'intérêt OSM à la demande
 - [ ] Lot 6 : accueil et création (maquettes puis code)
@@ -69,9 +69,12 @@ Options :
 
 ## Lot 3 : géographie libre
 
-- [ ] Service de recherche de lieux sur OSM (Photon de préférence : le Nominatim public interdit l'autocomplétion pendant la frappe). Politique d'usage à vérifier et à respecter (règle 8). Ajout d'une étape par recherche ou par appui long sur la carte (ADR 0004).
-- [ ] Fin de la région unique : `src/lib/regions.ts`, `src/lib/catalog.ts` et l'écran de démarrage ne supposent plus `nz-south`. Carte cadrée sur la zone du voyage.
-- [ ] Calques DOC et catalogue NZ réservés aux voyages dont la zone touche la Nouvelle-Zélande.
+- [x] Recherche de lieux sur OSM par Photon (`src/lib/place-search.ts` pur et testé, `src/services/place-search.ts`, `usePlaceSearch`, `PlaceSearchField`). Politique vérifiée le 3 nov. 2026 : le serveur public accepte l'usage « dans une limite raisonnable », ralentit ou bannit l'usage intensif, sans chiffre publié ; réponse avec `Access-Control-Allow-Origin: *`, `lang=fr` accepté. D'où : recherche à partir de trois caractères, 450 ms après la dernière frappe, requête précédente annulée, une requête par seconde au plus, cache en mémoire (60 recherches), attribution « Recherche Photon · © contributeurs OpenStreetMap » sous les résultats. Résultats proches de l'étape en cours d'abord (`searchBias`, zoom 7). Plafond `geocode` : une unité par requête envoyée pour un compte connecté, rien sans compte ; un refus bloque la recherche et le dit, un compteur muet ne la bloque pas (garde-fou, ADR 0006). Le plafond de 500 par compte et par jour reste : Photon ne publie pas de limite à laquelle le confronter.
+- [x] Ajout d'une étape par recherche (panneau Planifier : catalogue local puis OSM, doublons à moins de 2 km retirés) ou par appui long sur la carte (minuterie sur un doigt immobile pour iOS, `contextmenu` pour le clic droit et Android, `src/components/map-long-press.ts`). Le dialogue « Nouveau lieu » propose le nom du lieu OSM le plus proche (recherche inversée) et sa localisation.
+- [x] Fin de la région unique : plus de région par défaut sans voyage (`catalogRegionIds(null)` vide) ; l'écran de démarrage choisit le départ par recherche (tous les catalogues publics hors ligne, puis OSM) au lieu de la liste des villes néo-zélandaises. `inSouthIsland`, inutilisé, retiré. La carte était déjà cadrée sur la zone du voyage (lot 1).
+- [x] Calques réservés à la Nouvelle-Zélande : en plus des calques DOC (lot 1), les campings OSM générés au build sur son cadre (plus téléchargés ailleurs) et les interrupteurs « Villes » et « Spots » du catalogue, vides ailleurs.
+- Interface provisoire : le champ de recherche reprend la place de l'ancien, sans maquette ; la recherche de lieux aura sa maquette au lot 6 avec l'accueil et la création.
+- Reste : un repère (départ, arrivée) ne garde pas la localisation du lieu (`area`), donc l'étape de départ s'affiche sans sous-titre ; à traiter avec l'écran de création (lot 6). Le plafond n'a pas été vu en action avec un vrai compte dans le navigateur (identifiants de test absents du dépôt) : couvert par des tests du service avec compteur simulé, et `consume_quota` par `rls-check` (lot 2). Photon a répondu en 2 à 3,5 s pendant les essais.
 
 ## Lot 4 : routage par tronçon
 
@@ -119,4 +122,4 @@ Toute nouvelle idée s'ajoute ici et n'en sort que par une décision explicite d
 
 ## Points à vérifier en cours de route
 
-Non vérifiés au cadrage : politique d'usage de Photon et d'Overpass, poids d'une bibliothèque de fuseaux embarquée, source des taux BCE utilisable depuis le navigateur (CORS), quotas gratuits des Edge Functions Supabase.
+Non vérifiés au cadrage : politique d'usage de Photon (vérifiée au lot 3) et d'Overpass, poids d'une bibliothèque de fuseaux embarquée, source des taux BCE utilisable depuis le navigateur (CORS), quotas gratuits des Edge Functions Supabase.

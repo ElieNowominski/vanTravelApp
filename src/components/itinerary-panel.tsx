@@ -1,5 +1,5 @@
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
   ChevronDown,
@@ -11,23 +11,23 @@ import {
   Moon,
   RotateCcw,
   Route,
-  Search,
   Trash2,
   Unlock,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { ConfirmAction } from "@/components/confirm-action";
 import { InstallButton } from "@/components/install-button";
+import { PlaceSearchField } from "@/components/place-search-field";
 import { ModeSwitch } from "@/components/mode-switch";
 import { SyncStatusButton } from "@/components/account/sync-status-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TripLibraryButton } from "@/components/trip-library-dialog";
 import { TripMarksEditor } from "@/components/trip-marks-editor";
 import { StopActivitiesEditor } from "@/components/stop-activities-editor";
-import { buildCatalog, placeToInput, searchCatalog } from "@/lib/catalog";
+import { buildCatalog, catalogOption, searchCatalog } from "@/lib/catalog";
+import { searchBias } from "@/lib/place-search";
 import { captureTripMapImage } from "@/lib/capture-map";
 import { START_STOP_ID, dayColor } from "@/lib/constants";
 import { useTripZone } from "@/hooks/use-trip-zone";
@@ -36,7 +36,7 @@ import { DEFAULT_PROFILE, TRAVEL_MODE_LABELS } from "@/lib/profiles";
 import { getActiveMap } from "@/lib/map-registry";
 import { exportTripPdf } from "@/lib/export-pdf";
 import { formatDateRange, formatDayDrive, formatDuration, formatKm, formatShortDay } from "@/lib/format";
-import { catalogKindLabel, overnightCaption, stayById } from "@/lib/trip-plan";
+import { overnightCaption, stayById } from "@/lib/trip-plan";
 import { patchSavedTripMarks } from "@/lib/trip-library";
 import { cn } from "@/lib/utils";
 import { dayStats, selectedOption, useTripStore } from "@/store/trip-store";
@@ -69,12 +69,12 @@ export function ItineraryPanel() {
   const { label: zoneName } = useTripZone();
   const vehicle = config?.profile ?? DEFAULT_PROFILE;
 
-  const [query, setQuery] = useState("");
   const [exporting, setExporting] = useState(false);
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [marksOpen, setMarksOpen] = useState(false);
   const [openStopId, setOpenStopId] = useState<string | null>(null);
-  const results = useMemo(() => (query.trim() ? searchCatalog(catalog, query).slice(0, 8) : []), [query, catalog]);
+  const localResults = useCallback((query: string) => searchCatalog(catalog, query).map(catalogOption), [catalog]);
+  const bias = useMemo(() => searchBias({ days, stops }, currentDayIndex, config?.start), [days, stops, currentDayIndex, config]);
   const plusCount = marks.filter((mark) => mark.kind === "plus").length;
   const minusCount = marks.filter((mark) => mark.kind === "minus").length;
 
@@ -225,47 +225,18 @@ export function ItineraryPanel() {
       </header>
 
       <div className="border-b px-4 py-2">
-        <div className="relative">
-          <Search className="absolute top-2 left-2 size-3.5 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Rechercher Tekapo, Milford…"
-            className="pl-7"
-          />
-        </div>
-        {results.length > 0 && (
-          <ul className="mt-2 max-h-40 overflow-auto rounded-lg border bg-card">
-            {results.map((place) => (
-              <li key={place.id}>
-                <button
-                  type="button"
-                  className="flex w-full items-start justify-between gap-2 px-2.5 py-1.5 text-left text-sm hover:bg-muted"
-                  onClick={() => {
-                    void addPlace(placeToInput(place));
-                    setQuery("");
-                  }}
-                >
-                  <span>
-                    {place.name}
-                    <span className="block text-xs text-muted-foreground">
-                      {place.kind === "camp" && place.area
-                        ? `${place.area} · ${catalogKindLabel(place.kind, place.category)}`
-                        : `${catalogKindLabel(place.kind, place.category)} · ${place.region}`}
-                    </span>
-                  </span>
-                  <span className="text-xs text-primary">Ajouter</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        <PlaceSearchField
+          placeholder="Ville, camping, gare, point de vue…"
+          local={localResults}
+          bias={bias}
+          onSelect={(place) => void addPlace(place)}
+        />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">
         <div className="flex flex-col gap-3 p-3">
           <p className="px-1 text-xs text-muted-foreground">
-            Clique une ville ou un spot sur la carte pour enchaîner les étapes. « Nuit ici »
+            Cherche un lieu, clique une ville ou un spot sur la carte, ou appuie longuement sur la carte pour enchaîner les étapes. « Nuit ici »
             valide la journée. « Sur le chemin » note les activités de l’étape.
           </p>
           {days.map((day, index) => {

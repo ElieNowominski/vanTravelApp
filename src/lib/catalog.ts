@@ -1,6 +1,8 @@
 import nzPois from "@/data/catalog/nz-south/pois.json";
 import nzTowns from "@/data/catalog/nz-south/towns.json";
-import { DEFAULT_REGION_ID, regionsContaining } from "@/lib/regions";
+import type { PlaceOption } from "@/lib/place-search";
+import { regionsContaining } from "@/lib/regions";
+import { catalogKindLabel } from "@/lib/trip-plan";
 import type { CatalogPlace, PlaceInput, PlaceKind, TripConfig } from "@/lib/types";
 
 export type CatalogEntry = CatalogPlace & { kind: PlaceKind };
@@ -26,11 +28,11 @@ function configPoints(config: TripConfig): Array<{ lng: number; lat: number }> {
 }
 
 /**
- * Régions dont le catalogue public s'applique : celles que touche le voyage. Sans voyage (écran de création),
- * la région par défaut, seule à avoir un catalogue tant que la recherche de lieux n'existe pas (lot 3).
+ * Régions dont le catalogue public s'applique : celles que touche le voyage. Sans voyage, aucune : l'écran
+ * de création cherche dans tous les catalogues (`searchPublicCatalogs`) et sur OSM (lot 3).
  */
 export function catalogRegionIds(config: TripConfig | null | undefined): string[] {
-  if (!config) return [DEFAULT_REGION_ID];
+  if (!config) return [];
   return regionsContaining(configPoints(config)).filter((id) => PUBLIC_CATALOG[id]);
 }
 
@@ -75,6 +77,28 @@ export function searchCatalog(catalog: Catalog, query: string): CatalogEntry[] {
     const hay = `${p.name} ${p.area ?? ""} ${p.region} ${p.category ?? ""} ${p.notes ?? ""}`.toLowerCase();
     return hay.includes(q);
   });
+}
+
+/** Villes et lieux de tous les catalogues publics, quel que soit le voyage (écran de création, hors ligne). */
+export function searchPublicCatalogs(query: string): CatalogEntry[] {
+  const all: Catalog = {
+    regionIds: Object.keys(PUBLIC_CATALOG),
+    towns: Object.values(PUBLIC_CATALOG).flatMap((pub) => pub.towns),
+    pois: Object.values(PUBLIC_CATALOG).flatMap((pub) => pub.pois),
+    stays: [],
+  };
+  return query.trim() ? searchCatalog(all, query) : [];
+}
+
+export function catalogOption(place: CatalogEntry): PlaceOption {
+  const label = catalogKindLabel(place.kind, place.category);
+  return {
+    key: `catalogue:${place.kind}:${place.id}`,
+    name: place.name,
+    caption: place.kind === "camp" && place.area ? `${label} · ${place.area}` : `${label} · ${place.region}`,
+    source: "catalogue",
+    input: placeToInput(place),
+  };
 }
 
 export function placeToInput(place: CatalogEntry): PlaceInput {

@@ -23,6 +23,7 @@ import { AlternativesCard } from "@/components/alternatives-card";
 import { CustomPinDialog } from "@/components/custom-pin-dialog";
 import { DatasetNotice, type DatasetProblem } from "@/components/dataset-notice";
 import { LayerControls } from "@/components/layer-controls";
+import { attachLongPress } from "@/components/map-long-press";
 import { PlacePopup } from "@/components/map-popup";
 import { showReactPopup } from "@/components/react-popup";
 
@@ -277,7 +278,14 @@ export function TripMap() {
       map.on("load", initLayers);
       if (map.isStyleLoaded()) initLayers();
 
+    // Appui long ou clic droit : une étape n'importe où, nommée par recherche inversée (lot 3).
+    const afterLongPress = attachLongPress(map, (lngLat) => {
+      popupRef.current?.remove();
+      setDraftPin({ lng: lngLat.lng, lat: lngLat.lat });
+    });
+
     map.on("click", (event: MapMouseEvent) => {
+      if (afterLongPress()) return;
       const pad = 14;
       const box: [[number, number], [number, number]] = [
         [event.point.x - pad, event.point.y - pad],
@@ -396,6 +404,8 @@ export function TripMap() {
   }, [nzSources]);
 
   useEffect(() => {
+    // Jeu OSM généré au build sur le cadre de la Nouvelle-Zélande : inutile ailleurs (le lot 5 l'interrogera à la demande).
+    if (!nzSources) return;
     let cancelled = false;
     loadDataset("osm-camps")
       .then((data) => {
@@ -407,7 +417,7 @@ export function TripMap() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [nzSources]);
 
   useEffect(() => {
     if (!nzSources) return;
@@ -434,7 +444,8 @@ export function TripMap() {
 
   return (
     <div className="relative h-full min-h-[50vh] w-full">
-      <div ref={containerRef} className="h-full w-full bg-[#d7e4d8]" />
+      {/* Pas de menu « copier, enregistrer l'image » d'iOS pendant l'appui long. */}
+      <div ref={containerRef} className="h-full w-full bg-[#d7e4d8] select-none [-webkit-touch-callout:none]" />
       {!mapReady && !mapError && (
         <div className="pointer-events-none absolute bottom-10 left-1/2 z-[5] -translate-x-1/2 rounded-full bg-background/90 px-3 py-1.5 text-xs text-muted-foreground shadow">
           Chargement de la carte…
