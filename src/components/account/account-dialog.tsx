@@ -54,7 +54,7 @@ function AccountDialogBody({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     if (!user || !online) return;
     let alive = true;
-    listMemberTrips()
+    listMemberTrips(user.id)
       .then((list) => alive && setTrips(list))
       .catch((error: unknown) => alive && setMessage(error instanceof Error ? error.message : "Liste des voyages impossible."));
     return () => {

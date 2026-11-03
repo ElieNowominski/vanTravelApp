@@ -20,10 +20,13 @@ function signal(): AbortSignal {
 
 export type MemberTrip = { id: string; name: string; ownerId: string; role: "owner" | "editor"; config: unknown };
 
-/** Les voyages dont la personne est membre, avec son rôle. */
-export async function listMemberTrips(): Promise<MemberTrip[]> {
+/**
+ * Les voyages dont la personne est membre, avec son rôle. Filtré sur sa propre ligne : la règle de lecture
+ * de `members` montre aussi les co-membres, ce qui donnait une ligne par membre du voyage.
+ */
+export async function listMemberTrips(userId: string): Promise<MemberTrip[]> {
   const client = requireSupabase();
-  const { data, error } = await client.from("members").select("role, trips(id, name, owner_id, config)").abortSignal(signal());
+  const { data, error } = await client.from("members").select("role, trips(id, name, owner_id, config)").eq("user_id", userId).abortSignal(signal());
   if (error) throw toSyncError(error, "Liste des voyages");
   type Row = { role: string; trips: { id: string; name: string; owner_id: string; config: unknown } | null };
   return ((data ?? []) as unknown as Row[])
