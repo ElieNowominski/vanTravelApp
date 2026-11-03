@@ -1,0 +1,3 @@
+# Dépenses converties en euros au taux du jour, réparties à plusieurs avec des poids
+
+Chaque dépense garde sa devise (la dernière utilisée dans le voyage est proposée, l'euro pour la première) et un taux de change vers l'euro figé à sa date, tiré des taux de référence de la BCE et modifiable à la main. Les totaux et le « qui doit combien » se font en euros, parce qu'un road trip multi-pays rend illisibles des totaux par devise. Le taux est stocké avec la dépense pour que les comptes restent exacts hors ligne ; sans réseau, la dépense est enregistrée sans taux et le reçoit au retour du réseau. La répartition suit le modèle de Tricount : un payeur, des bénéficiaires cochés, des poids, des remboursements minimisés, à la place des deux personnes à parts égales de la v1.

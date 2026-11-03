@@ -97,8 +97,8 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
     },
-    server: { port: 43217, strictPort: true, host: true },
-    preview: { port: 43217, strictPort: true },
+    server: { port: 43218, strictPort: true, host: true },
+    preview: { port: 43218, strictPort: true },
     build: { chunkSizeWarningLimit: 1600 },
     test: {
       environment: "node",

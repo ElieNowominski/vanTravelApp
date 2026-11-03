@@ -21,16 +21,16 @@ Rien de personnel ni de clé secrète n'entre dans ce dépôt : voir `.cursor/ru
 npm install
 cp .env.example .env.local   # puis VITE_SUPABASE_URL et VITE_SUPABASE_PUBLISHABLE_KEY du projet (clé publiable, jamais la secrète)
 npm run data        # une fois : télécharge les jeux de données publics
-npm run dev         # http://127.0.0.1:43217
+npm run dev         # http://127.0.0.1:43218
 ```
 
-Sans `.env.local`, l'app tourne en « local seulement » : pas de compte ni de synchro, tout le reste marche. Pour tester depuis un téléphone sur le même Wi-Fi : `http://<ip-du-pc>:43217/` (connexion par e-mail ; Google exige une origine déclarée dans Supabase).
+Sans `.env.local`, l'app tourne en « local seulement » : pas de compte ni de synchro, tout le reste marche. Pour tester depuis un téléphone sur le même Wi-Fi : `http://<ip-du-pc>:43218/` (connexion par e-mail ; Google exige une origine déclarée dans Supabase).
 
 ## Commandes
 
 | Commande | Rôle |
 | --- | --- |
-| `npm run dev` | Serveur de dev, port 43217 |
+| `npm run dev` | Serveur de dev, port 43218 |
 | `npm run build` | `tsc -b` puis build Vite dans `dist/` (avec `404.html` pour GitHub Pages) |
 | `npm run preview` | Sert `dist/` |
 | `npm run lint` | ESLint |
