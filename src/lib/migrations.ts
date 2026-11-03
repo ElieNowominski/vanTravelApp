@@ -1,4 +1,5 @@
 import { newId } from "@/lib/geo";
+import { isTravelMode } from "@/lib/profiles";
 import { normalizeActivities } from "@/lib/stop-activities";
 import type {
   Booking,
@@ -7,9 +8,14 @@ import type {
   EntityMeta,
   Expense,
   ExpenseCategory,
+  Leg,
+  ManualLeg,
+  RouteOption,
   Stop,
   TripDay,
   TripDocument,
+  TrackKind,
+  TravelMode,
   TripSnapshot,
 } from "@/lib/types";
 
@@ -23,10 +29,13 @@ import type {
  *     jour += `notesAt`, `weatherAt` ; réservation += `accessCodeSecure` (code chiffré).
  * 4 : navigation Voyager. Document d'étape += `scope` (« nuit » si l'étape est une nuit, sinon « activite »,
  *     quand il manque) ; dépense += `stopId` (optionnel) ; snapshot += `tripDocuments` (documents hors étape).
+ * 5 : v2, modes de déplacement (ADR 0002). Tronçon += `mode` (« van » quand il manque : la v1 ne connaissait
+ *     que le van), `track`, `manual` (tronçon sans tracé) ; option de route : `durationCarSec` devient
+ *     `durationRawSec`, `durationVanSec` devient `durationSec`.
  *
  * La migration est idempotente : on peut la passer sur des données déjà à jour.
  */
-export const SNAPSHOT_SCHEMA_VERSION = 4;
+export const SNAPSHOT_SCHEMA_VERSION = 5;
 
 export const EXPENSE_CATEGORY_IDS: ExpenseCategory[] = [
   "carburant",
@@ -163,6 +172,70 @@ export function migrateStop(stop: Partial<Stop> & Record<string, unknown>): Stop
   };
 }
 
+function normalizeRouteOption(value: unknown): RouteOption[] {
+  if (!isRecord(value)) return [];
+  const geometry = value.geometry;
+  if (!isRecord(geometry) || geometry.type !== "LineString" || !Array.isArray(geometry.coordinates)) return [];
+  const durationSec = num(value.durationSec) ?? num(value.durationVanSec) ?? 0;
+  return [
+    {
+      geometry: geometry as unknown as GeoJSON.LineString,
+      distanceKm: num(value.distanceKm) ?? 0,
+      durationRawSec: num(value.durationRawSec) ?? num(value.durationCarSec) ?? durationSec,
+      durationSec,
+      winding: value.winding === true,
+      label: typeof value.label === "string" ? value.label : "",
+    },
+  ];
+}
+
+function normalizeManualLeg(value: unknown): ManualLeg | undefined {
+  if (!isRecord(value)) return undefined;
+  const manual: ManualLeg = {
+    durationSec: num(value.durationSec),
+    distanceKm: num(value.distanceKm),
+    departAt: str(value.departAt),
+    arriveAt: str(value.arriveAt),
+    operator: str(value.operator),
+    notes: str(value.notes),
+  };
+  return Object.fromEntries(Object.entries(manual).filter(([, v]) => v !== undefined)) as ManualLeg;
+}
+
+function trackKind(value: unknown, options: RouteOption[], manual: ManualLeg | undefined): TrackKind {
+  if (value === "calcule" || value === "importe" || value === "aucun") return value;
+  return options.length === 0 && manual ? "aucun" : "calcule";
+}
+
+/** Tronçons de n'importe quelle version ; un tronçon sans étapes ni identifiant est écarté. */
+export function normalizeLegs(value: unknown, defaultMode: TravelMode = "van"): Leg[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item): Leg[] => {
+    if (!isRecord(item)) return [];
+    const id = str(item.id);
+    const fromStopId = str(item.fromStopId);
+    const toStopId = str(item.toStopId);
+    if (!id || !fromStopId || !toStopId) return [];
+    const options = Array.isArray(item.options) ? item.options.flatMap(normalizeRouteOption) : [];
+    const manual = normalizeManualLeg(item.manual);
+    const selectedIndex = num(item.selectedIndex) ?? 0;
+    return [
+      {
+        id,
+        fromStopId,
+        toStopId,
+        dayIndex: num(item.dayIndex) ?? 0,
+        mode: isTravelMode(item.mode) ? item.mode : defaultMode,
+        track: trackKind(item.track, options, manual),
+        options,
+        selectedIndex: selectedIndex >= 0 && selectedIndex < options.length ? selectedIndex : 0,
+        estimated: item.estimated === true,
+        ...(manual ? { manual } : {}),
+      },
+    ];
+  });
+}
+
 /** Pierres tombales : id -> date ISO, tout le reste est ignoré. */
 export function normalizeTombstones(value: unknown): Record<string, string> {
   if (!isRecord(value)) return {};
@@ -215,7 +288,7 @@ export function migrateSnapshot<T extends Partial<TripSnapshot>>(raw: T): T & Tr
     schemaVersion: SNAPSHOT_SCHEMA_VERSION,
     days: normalizeDays(raw.days),
     stops: normalizeStops(raw.stops),
-    legs: Array.isArray(raw.legs) ? raw.legs : [],
+    legs: normalizeLegs(raw.legs),
     customPins: Array.isArray(raw.customPins) ? raw.customPins : [],
     currentDayIndex: typeof raw.currentDayIndex === "number" ? raw.currentDayIndex : 0,
     frozenAt: typeof raw.frozenAt === "string" ? raw.frozenAt : null,

@@ -67,11 +67,11 @@ export async function exportTripPdf(
     const placeName = (id: string) => findCatalogPlace(catalog, id)?.name ?? id;
     const firstDate = config.arrival?.date ?? config.start.date;
     write(
-      `${formatPdfRange(firstDate, config.end.date)}  ·  ${config.vehicle.name}  ·  ${placeName(config.start.placeId)} -> ${placeName(config.end.placeId)}`,
+      `${formatPdfRange(firstDate, config.end.date)}  ·  ${config.profile.name}  ·  ${placeName(config.start.placeId)} -> ${placeName(config.end.placeId)}`,
       10,
       [90, 90, 90],
     );
-    const v = config.vehicle;
+    const v = config.profile;
     const dims =
       typeof v.lengthM === "number" && typeof v.widthM === "number"
         ? `${v.lengthM} m × ${v.widthM} m${typeof v.heightM === "number" ? `, ~${v.heightM} m` : ""}. `
@@ -147,7 +147,7 @@ export async function exportTripPdf(
         const est = inbound?.estimated ? " · estimé" : "";
         write(`${fromName}  →  ${stop.name}`, 8, [70, 90, 80], "bold", 5);
         write(
-          `${formatKm(opt.distanceKm)}  ·  ${formatDuration(opt.durationVanSec)} van (voiture ${formatDuration(opt.durationCarSec)})${winding}${est}`,
+          `${formatKm(opt.distanceKm)}  ·  ${formatDuration(opt.durationSec)} van (voiture ${formatDuration(opt.durationRawSec)})${winding}${est}`,
           8,
           [110, 110, 110],
           "normal",

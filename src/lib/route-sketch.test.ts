@@ -17,12 +17,12 @@ const snapshot: TripSnapshot = {
   stops: { s1: stop("s1", "A", 172.6, -43.5), s2: stop("s2", "B", 170.5, -44.0), s3: stop("s3", "C", 169.1, -44.7) },
   legs: [
     {
-      id: "l1", fromStopId: "s1", toStopId: "s2", dayIndex: 0, selectedIndex: 0, estimated: false,
-      options: [{ label: "", distanceKm: 1, durationCarSec: 1, durationVanSec: 1, winding: false, geometry: { type: "LineString", coordinates: [[172.6, -43.5], [171.5, -43.8], [170.5, -44.0]] } }],
+      id: "l1", fromStopId: "s1", toStopId: "s2", mode: "van", track: "calcule", dayIndex: 0, selectedIndex: 0, estimated: false,
+      options: [{ label: "", distanceKm: 1, durationRawSec: 1, durationSec: 1, winding: false, geometry: { type: "LineString", coordinates: [[172.6, -43.5], [171.5, -43.8], [170.5, -44.0]] } }],
     },
     {
-      id: "l2", fromStopId: "s2", toStopId: "s3", dayIndex: 1, selectedIndex: 0, estimated: true,
-      options: [{ label: "", distanceKm: 1, durationCarSec: 1, durationVanSec: 1, winding: false, geometry: { type: "LineString", coordinates: [[170.5, -44.0], [169.1, -44.7]] } }],
+      id: "l2", fromStopId: "s2", toStopId: "s3", mode: "van", track: "calcule", dayIndex: 1, selectedIndex: 0, estimated: true,
+      options: [{ label: "", distanceKm: 1, durationRawSec: 1, durationSec: 1, winding: false, geometry: { type: "LineString", coordinates: [[170.5, -44.0], [169.1, -44.7]] } }],
     },
   ],
 };

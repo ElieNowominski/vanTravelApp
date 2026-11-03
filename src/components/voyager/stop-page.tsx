@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowLeft, Phone, Plus } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -12,8 +12,7 @@ import { VoyagerFrame } from "@/components/voyager/voyager-frame";
 import { useBack } from "@/hooks/use-back";
 import { useDraftField } from "@/hooks/use-draft-field";
 import { DOCUMENT_SCOPES, documentScope } from "@/lib/documents";
-import { expensesForStop, formatMoney, formatTotals, stopCosts } from "@/lib/expenses";
-import { getRegion } from "@/lib/regions";
+import { allExpenses, defaultExpenseCurrency, expensesForStop, formatMoney, formatTotals, stopCosts } from "@/lib/expenses";
 import { catalogKindLabel } from "@/lib/trip-plan";
 import type { Booking, DocumentScope, Stop } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -48,7 +47,6 @@ function StopPageBody() {
 }
 
 function StopSheet({ stop }: { stop: Stop }) {
-  const config = useTripStore((s) => s.config);
   const days = useTripStore((s) => s.days);
   const upsertBooking = useTripStore((s) => s.upsertBooking);
   const removeBooking = useTripStore((s) => s.removeBooking);
@@ -63,7 +61,7 @@ function StopSheet({ stop }: { stop: Stop }) {
   const back = useBack("/");
   const [editing, setEditing] = useState<Booking | null | "new">(null);
 
-  const region = getRegion(config?.regionId);
+  const proposedCurrency = useMemo(() => defaultExpenseCurrency(allExpenses(days)), [days]);
   const dayIndex = days.findIndex((day) => day.stopIds.includes(stop.id));
   const day = dayIndex >= 0 ? days[dayIndex] : null;
   const isNight = stop.isOvernight || days.some((d) => d.overnightStopId === stop.id);
@@ -130,7 +128,7 @@ function StopSheet({ stop }: { stop: Stop }) {
           {editing ? (
             <BookingForm
               initial={editing === "new" ? null : editing}
-              defaultCurrency={region.currency}
+              defaultCurrency={proposedCurrency}
               onCancel={() => setEditing(null)}
               onSubmit={(input) => {
                 upsertBooking(stop.id, input, editing === "new" ? undefined : editing.id);

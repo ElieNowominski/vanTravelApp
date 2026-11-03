@@ -1,7 +1,7 @@
 import { TRIP_LIBRARY_DB, TRIP_LIBRARY_LS, TRIP_LIBRARY_STORE } from "@/lib/constants";
 import { newId } from "@/lib/geo";
 import { SNAPSHOT_SCHEMA_VERSION, migrateSnapshot } from "@/lib/migrations";
-import { isTripConfig } from "@/lib/trip-config";
+import { normalizeTripConfig } from "@/lib/trip-config";
 import { normalizeMarks } from "@/lib/trip-marks";
 import type { SavedTrip, TripConfig, TripMark, TripSnapshot } from "@/lib/types";
 import { dayStats } from "@/store/trip-store";
@@ -50,7 +50,7 @@ export function buildSavedTrip(
     km: stats.km,
     nights: stats.nights,
     marks: normalizeMarks(marks),
-    config: isTripConfig(config) ? structuredClone(config) : null,
+    config: structuredClone(normalizeTripConfig(config)),
     days: structuredClone(snapshot.days),
     stops: structuredClone(snapshot.stops),
     legs: structuredClone(snapshot.legs),
@@ -93,7 +93,7 @@ function hydrateTrip(trip: SavedTrip): SavedTrip {
   return {
     ...migrateSnapshot(trip),
     marks: normalizeMarks(trip.marks),
-    config: isTripConfig(trip.config) ? trip.config : null,
+    config: normalizeTripConfig(trip.config),
   };
 }
 

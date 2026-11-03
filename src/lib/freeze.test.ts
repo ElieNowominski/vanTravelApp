@@ -6,8 +6,8 @@ function option(label: string, points: number): RouteOption {
   return {
     label,
     distanceKm: 100,
-    durationCarSec: 3600,
-    durationVanSec: 4680,
+    durationRawSec: 3600,
+    durationSec: 4680,
     winding: false,
     geometry: {
       type: "LineString",
@@ -21,6 +21,8 @@ const leg: Leg = {
   fromStopId: "s1",
   toStopId: "s2",
   dayIndex: 0,
+  mode: "van",
+  track: "calcule",
   options: [option("A", 400), option("B", 500), option("C", 300)],
   selectedIndex: 1,
   estimated: false,

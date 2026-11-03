@@ -36,7 +36,7 @@ export function AlternativesCard() {
                 {option.winding ? " · lente" : ""}
               </span>
               <span className="text-muted-foreground">
-                {formatDuration(option.durationVanSec)} · {formatKm(option.distanceKm)}
+                {formatDuration(option.durationSec)} · {formatKm(option.distanceKm)}
               </span>
             </button>
           );

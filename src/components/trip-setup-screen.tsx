@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { parseBackup, restoreBackup } from "@/lib/backup";
 import { buildCatalog, findCatalogPlace } from "@/lib/catalog";
-import { DEFAULT_VEHICLE } from "@/lib/constants";
+import { profileFromPreset } from "@/lib/profiles";
 import { DEFAULT_REGION_ID, getRegion } from "@/lib/regions";
 import { slugify } from "@/lib/trip-config";
 import { listSavedTrips } from "@/lib/trip-library";
@@ -71,12 +71,12 @@ export function TripSetupScreen() {
     if (!place) return setStatus("Choisis un point de départ.");
     const config: TripConfig = {
       id: `trip-${slugify(trimmed)}-${startDate}`,
-      schemaVersion: 1,
+      schemaVersion: 2,
       name: trimmed,
-      regionId: region.id,
-      start: { placeId: place.id, date: startDate },
-      end: { placeId: place.id, date: endDate },
-      vehicle: { ...DEFAULT_VEHICLE },
+      defaultMode: "van",
+      start: { placeId: place.id, name: place.name, lng: place.lng, lat: place.lat, date: startDate },
+      end: { placeId: place.id, name: place.name, lng: place.lng, lat: place.lat, date: endDate },
+      profile: profileFromPreset("van"),
       stays: [],
       plan: { days: [] },
     };

@@ -2,19 +2,27 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { idbStorage } from "@/lib/idb-storage";
 import { buildCatalog, findCatalogPlace, placeToInput } from "@/lib/catalog";
-import { DEFAULT_VEHICLE, START_STOP_ID, STORAGE_KEY } from "@/lib/constants";
+import { START_STOP_ID, STORAGE_KEY } from "@/lib/constants";
 import { eachDateInclusive, formatDayLabel } from "@/lib/format";
 import { freezeSnapshot } from "@/lib/freeze";
 import { newId } from "@/lib/geo";
-import { SNAPSHOT_SCHEMA_VERSION, normalizeDays, normalizeDocuments, normalizeStops, normalizeTombstones } from "@/lib/migrations";
+import { legDistanceKm, legDurationSec, selectedOption } from "@/lib/legs";
+import {
+  SNAPSHOT_SCHEMA_VERSION,
+  normalizeDays,
+  normalizeDocuments,
+  normalizeLegs,
+  normalizeStops,
+  normalizeTombstones,
+} from "@/lib/migrations";
+import { DEFAULT_PROFILE, isRoadMode } from "@/lib/profiles";
 import { createTravelSlice, type TravelSlice } from "@/store/travel-slice";
-import { configFromSnapshot, isTripConfig, tripDates } from "@/lib/trip-config";
+import { configFromSnapshot, normalizeTripConfig, tripDates } from "@/lib/trip-config";
 import { normalizeMarks } from "@/lib/trip-marks";
 import type {
   LayersState,
   Leg,
   PlaceInput,
-  RouteOption,
   SavedTrip,
   Stop,
   TripConfig,
@@ -22,8 +30,9 @@ import type {
   TripDocument,
   TripMark,
   TripMarkKind,
+  TravelMode,
+  TravelProfile,
   TripSnapshot,
-  Vehicle,
 } from "@/lib/types";
 import { routeBetween } from "@/services/routing";
 
@@ -109,13 +118,21 @@ function emptyStopExtras(): Pick<Stop, "activities" | "bookings" | "documents" |
 function seedStart(config: TripConfig | null): { days: TripDay[]; stops: Record<string, Stop> } {
   const days = emptyDays(config);
   if (!config || days.length === 0) return { days, stops: {} };
+  // v2 : le repère porte sa position ; le catalogue ne sert plus qu'aux voyages v1 non complétés.
   const place = findCatalogPlace(buildCatalog(config), config.start.placeId);
-  if (!place) return { days, stops: {} };
+  const { start } = config;
+  const input =
+    typeof start.lng === "number" && typeof start.lat === "number"
+      ? { placeId: start.placeId, name: start.name ?? start.placeId, lng: start.lng, lat: start.lat, kind: "town" as const, ...(place ? { area: place.area } : {}) }
+      : place
+        ? placeToInput(place)
+        : null;
+  if (!input) return { days, stops: {} };
   const stop: Stop = {
-    ...placeToInput(place),
+    ...input,
     id: START_STOP_ID,
     isOvernight: false,
-    notes: config.start.notes ?? place.notes,
+    notes: start.notes ?? place?.notes,
     ...emptyStopExtras(),
   };
   days[0].stopIds = [stop.id];
@@ -184,13 +201,21 @@ function sameCalendar(days: TripDay[], config: TripConfig): boolean {
   return days.length === dates.length && days.every((day, i) => day.date === dates[i]);
 }
 
-async function buildLeg(from: Stop, to: Stop, dayIndex: number, vehicle: Vehicle): Promise<Leg> {
-  const result = await routeBetween(from, to, vehicle);
+/**
+ * Tronçon neuf, dans le mode par défaut du voyage. Un mode non routier (train, ferry) est encore calculé par
+ * la route en attendant la saisie manuelle (lot 4) : la durée affichée reste une estimation routière.
+ */
+async function buildLeg(from: Stop, to: Stop, dayIndex: number, config: TripConfig | null): Promise<Leg> {
+  const profile: TravelProfile = config?.profile ?? DEFAULT_PROFILE;
+  const mode: TravelMode = config?.defaultMode ?? profile.mode;
+  const result = await routeBetween(from, to, profile);
   return {
     id: newId("leg"),
     fromStopId: from.id,
     toStopId: to.id,
     dayIndex,
+    mode: isRoadMode(mode) ? mode : profile.mode,
+    track: "calcule",
     options: result.options,
     selectedIndex: 0,
     estimated: result.estimated,
@@ -225,7 +250,7 @@ export const useTripStore = create<TripState>()(
           ...(patch.config !== undefined ? { config: patch.config } : {}),
           ...(patch.days ? { days: normalizeDays(patch.days) } : {}),
           ...(patch.stops ? { stops: normalizeStops(patch.stops) } : {}),
-          ...(patch.legs ? { legs: patch.legs } : {}),
+          ...(patch.legs ? { legs: normalizeLegs(patch.legs) } : {}),
           ...(patch.customPins ? { customPins: patch.customPins } : {}),
           ...(patch.currentDayIndex !== undefined ? { currentDayIndex: patch.currentDayIndex } : {}),
           ...(patch.frozenAt !== undefined ? { frozenAt: patch.frozenAt } : {}),
@@ -273,7 +298,7 @@ export const useTripStore = create<TripState>()(
 
         if (!from || sameAsDeparture) return;
         try {
-          const leg = await buildLeg(from, stop, dayIndex, get().config?.vehicle ?? DEFAULT_VEHICLE);
+          const leg = await buildLeg(from, stop, dayIndex, get().config);
           set((prev) => ({
             legs: [...prev.legs.filter((l) => l.toStopId !== stop.id), leg],
             routingStatus: "idle",
@@ -333,7 +358,7 @@ export const useTripStore = create<TripState>()(
           if (from && to) {
             set({ routingStatus: "loading", routingMessage: "Recalcul du segment…" });
             try {
-              const leg = await buildLeg(from, to, dayIndex, get().config?.vehicle ?? DEFAULT_VEHICLE);
+              const leg = await buildLeg(from, to, dayIndex, get().config);
               set((prev) => ({
                 legs: [...prev.legs, leg],
                 routingStatus: "idle",
@@ -480,12 +505,10 @@ export const useTripStore = create<TripState>()(
 
       loadSavedTrip: (trip) => {
         set((prev) => ({
-          config: isTripConfig(trip.config)
-            ? trip.config
-            : configFromSnapshot(trip, { name: trip.name }) ?? prev.config,
+          config: normalizeTripConfig(trip.config) ?? configFromSnapshot(trip, { name: trip.name }) ?? prev.config,
           days: normalizeDays(structuredClone(trip.days)),
           stops: normalizeStops(structuredClone(trip.stops)),
-          legs: structuredClone(trip.legs),
+          legs: normalizeLegs(structuredClone(trip.legs)),
           customPins: structuredClone(trip.customPins ?? []),
           currentDayIndex: trip.currentDayIndex,
           activeSavedId: trip.id,
@@ -580,7 +603,7 @@ export const useTripStore = create<TripState>()(
         return {
           ...current,
           ...p,
-          config: isTripConfig(p.config) ? p.config : null,
+          config: normalizeTripConfig(p.config),
           frozenAt: typeof p.frozenAt === "string" ? p.frozenAt : null,
           tombstones: normalizeTombstones(p.tombstones),
           tripDocuments: normalizeDocuments(p.tripDocuments),
@@ -589,7 +612,7 @@ export const useTripStore = create<TripState>()(
           marks: normalizeMarks(p.marks),
           stops: normalizeStops(p.stops ?? current.stops),
           days: normalizeDays(p.days),
-          legs: Array.isArray(p.legs) ? p.legs : [],
+          legs: normalizeLegs(p.legs),
           customPins: Array.isArray(p.customPins) ? p.customPins : [],
         };
       },
@@ -597,9 +620,7 @@ export const useTripStore = create<TripState>()(
   ),
 );
 
-export function selectedOption(leg: Leg): RouteOption | null {
-  return leg.options[leg.selectedIndex] ?? leg.options[0] ?? null;
-}
+export { selectedOption };
 
 export function currentSnapshot(state: {
   days: TripDay[];
@@ -626,8 +647,8 @@ export function currentSnapshot(state: {
 export function dayStats(state: { days: TripDay[]; stops: Record<string, Stop>; legs: Leg[] }, dayIndex: number) {
   const day = state.days[dayIndex];
   const dayLegs = state.legs.filter((l) => l.dayIndex === dayIndex);
-  const driveSec = dayLegs.reduce((sum, l) => sum + (selectedOption(l)?.durationVanSec ?? 0), 0);
-  const km = dayLegs.reduce((sum, l) => sum + (selectedOption(l)?.distanceKm ?? 0), 0);
+  const driveSec = dayLegs.reduce((sum, l) => sum + legDurationSec(l), 0);
+  const km = dayLegs.reduce((sum, l) => sum + legDistanceKm(l), 0);
   const overnight = day?.overnightStopId ? state.stops[day.overnightStopId] : null;
   return { driveSec, km, overnight, stopCount: day?.stopIds.length ?? 0 };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { expensesForStop, groupExpenses, parseAmount, settleUp, stopCosts, totalsByCurrency, tripExpenseTotals } from "@/lib/expenses";
+import { defaultExpenseCurrency, expensesForStop, groupExpenses, parseAmount, settleUp, stopCosts, totalsByCurrency, tripExpenseTotals } from "@/lib/expenses";
 import type { Expense } from "@/lib/types";
 
 function expense(amount: number, paidBy: string, currency = "NZD", category: Expense["category"] = "autre"): Expense {
@@ -116,5 +116,18 @@ describe("groupExpenses", () => {
 
   it("par catégorie : dans l'ordre des catégories", () => {
     expect(groupExpenses(snapshot, "category").map((g) => g.key)).toEqual(["carburant", "camping", "autre"]);
+  });
+});
+
+describe("defaultExpenseCurrency", () => {
+  it("propose la devise de la dernière dépense saisie, l'euro pour la première", () => {
+    expect(defaultExpenseCurrency([])).toBe("EUR");
+    expect(
+      defaultExpenseCurrency([
+        { currency: "NOK", updatedAt: "2027-06-03T10:00:00.000Z" },
+        { currency: "SEK", updatedAt: "2027-06-09T08:00:00.000Z" },
+        { currency: "DKK", updatedAt: "2027-06-01T12:00:00.000Z" },
+      ]),
+    ).toBe("SEK");
   });
 });

@@ -5,7 +5,8 @@ import { ArrowLeft } from "lucide-react";
 import { CompareMap } from "@/components/compare-map";
 import { TripMarksEditor } from "@/components/trip-marks-editor";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { COMPARE_COLORS, COMPARE_MAX, DEFAULT_VEHICLE } from "@/lib/constants";
+import { COMPARE_COLORS, COMPARE_MAX } from "@/lib/constants";
+import { DEFAULT_PROFILE } from "@/lib/profiles";
 import { compareStats } from "@/lib/compare";
 import { formatDuration, formatKm } from "@/lib/format";
 import { newId } from "@/lib/geo";
@@ -26,7 +27,7 @@ export function CompareApp() {
   const activeSavedId = useTripStore((s) => s.activeSavedId);
   const setMarks = useTripStore((s) => s.setMarks);
   const config = useTripStore((s) => s.config);
-  const maxDriveHours = config?.vehicle.maxComfortableDriveHours ?? DEFAULT_VEHICLE.maxComfortableDriveHours;
+  const maxDriveHours = config?.profile.maxComfortableDriveHours ?? DEFAULT_PROFILE.maxComfortableDriveHours;
 
   const refresh = useCallback(
     (keepIds?: string[]) =>

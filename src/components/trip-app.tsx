@@ -8,9 +8,9 @@ import { TripMap } from "@/components/trip-map";
 import { TripSetupScreen } from "@/components/trip-setup-screen";
 import { VoyagerApp } from "@/components/voyager/voyager-app";
 import { useTripBoot } from "@/hooks/use-trip-boot";
-import { getRegion } from "@/lib/regions";
+import { useTripZone } from "@/hooks/use-trip-zone";
 import { cn } from "@/lib/utils";
-import { defaultMode, todayInZone } from "@/lib/voyager";
+import { defaultMode } from "@/lib/voyager";
 import { useTripStore } from "@/store/trip-store";
 
 type MobileView = "map" | "list";
@@ -25,6 +25,7 @@ export function TripApp() {
   const config = useTripStore((s) => s.config);
   const frozenAt = useTripStore((s) => s.frozenAt);
   const uiMode = useTripStore((s) => s.uiMode);
+  const { today } = useTripZone();
 
   if (!ready) {
     return (
@@ -38,8 +39,8 @@ export function TripApp() {
     return <TripSetupScreen />;
   }
 
-  // Voyager par défaut pendant le voyage (fuseau de la région) ou dès que l'itinéraire est figé.
-  const mode = uiMode ?? defaultMode(config, frozenAt, todayInZone(getRegion(config.regionId).timeZone));
+  // Voyager par défaut pendant le voyage (fuseau de l'étape du jour) ou dès que l'itinéraire est figé.
+  const mode = uiMode ?? defaultMode(config, frozenAt, today);
   if (mode === "travel") return <VoyagerApp />;
   return <PlanApp />;
 }

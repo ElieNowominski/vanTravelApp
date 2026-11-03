@@ -111,13 +111,33 @@ export type Stop = PlaceInput & {
   notesAt?: string;
 };
 
+/** Façon de parcourir un tronçon (ADR 0002). Les trois premiers passent par le routage routier. */
+export type TravelMode = "van" | "voiture" | "moto" | "train" | "ferry" | "velo" | "marche";
+
+/** Tracé d'un tronçon : calculé par le routage (ou estimé), importé (GPX), ou absent (train, ferry). */
+export type TrackKind = "calcule" | "importe" | "aucun";
+
 export type RouteOption = {
   geometry: GeoJSON.LineString;
   distanceKm: number;
-  durationCarSec: number;
-  durationVanSec: number;
+  /** Durée renvoyée par le routage, avant le profil de déplacement. */
+  durationRawSec: number;
+  /** Durée retenue, ajustée par le profil (rythme du van, routes lentes). */
+  durationSec: number;
   winding: boolean;
   label: string;
+};
+
+/** Tronçon saisi à la main, sans tracé (train, ferry) : horaires et durée tels qu'annoncés. */
+export type ManualLeg = {
+  durationSec?: number;
+  distanceKm?: number;
+  /** Heures libres (« 16 h 30 »). */
+  departAt?: string;
+  arriveAt?: string;
+  /** Compagnie, numéro de train ou de traversée. */
+  operator?: string;
+  notes?: string;
 };
 
 export type Leg = {
@@ -125,9 +145,13 @@ export type Leg = {
   fromStopId: string;
   toStopId: string;
   dayIndex: number;
+  mode: TravelMode;
+  track: TrackKind;
   options: RouteOption[];
   selectedIndex: number;
   estimated: boolean;
+  /** Présent quand `track` vaut « aucun ». */
+  manual?: ManualLeg;
 };
 
 export type TripDay = {
@@ -197,22 +221,40 @@ export type SavedTrip = TripSnapshot & {
   config?: TripConfig | null;
 };
 
-/** Préréglage géographique public (cadre carte, fuseau). */
+export type BBox = { xmin: number; ymin: number; xmax: number; ymax: number };
+
+/**
+ * Préréglage géographique public. v2 : ne sert plus à cadrer un voyage (zone déduite des étapes, ADR 0003),
+ * seulement à reconnaître les sources propres à un pays (catalogue et calques DOC de la Nouvelle-Zélande)
+ * et à migrer les voyages de la v1.
+ */
 export type RegionPreset = {
   id: string;
   name: string;
   center: [number, number];
   zoom: number;
-  bbox: { xmin: number; ymin: number; xmax: number; ymax: number };
+  bbox: BBox;
   maxBounds: [[number, number], [number, number]];
   timeZone: string;
   /** Devise locale par défaut des dépenses (code ISO 4217). */
   currency: string;
+  /** Pays couverts (ISO 3166-1 alpha-2). */
+  countries: string[];
 };
 
 export type RestrictedRoad = { id: string; name: string; note: string };
 
-export type Vehicle = {
+/** Préréglage standard dont un profil est copié (Q13 du cadrage). */
+export type ProfilePresetId = "van" | "camping-car" | "voiture" | "moto";
+
+/**
+ * Profil de déplacement du voyage : caractéristiques du moyen de transport qui jouent sur les temps et les routes.
+ * Copié depuis un préréglage puis ajustable ; le voyage garde son propre exemplaire.
+ */
+export type TravelProfile = {
+  presetId: ProfilePresetId;
+  /** Mode des tronçons routiers de ce profil. */
+  mode: TravelMode;
   name: string;
   selfContained: boolean;
   lengthM?: number;
@@ -227,11 +269,18 @@ export type Vehicle = {
   restrictedRoads?: RestrictedRoad[];
 };
 
+/** Véhicule de la v1 : lu à la migration seulement. */
+export type Vehicle = Omit<TravelProfile, "presetId" | "mode">;
+
 export type TripMilestone = {
   placeId: string;
   date: string;
   label?: string;
   notes?: string;
+  /** v2 : nom et position du lieu, pour ne plus dépendre d'un catalogue (voyage n'importe où). */
+  name?: string;
+  lng?: number;
+  lat?: number;
 };
 
 export type PlanStop = {
@@ -247,17 +296,21 @@ export type TripPlan = {
 
 /**
  * Un voyage : tout ce qui est propre à un séjour donné.
- * Données personnelles : vit dans le dépôt privé, jamais dans le bundle.
+ * Données personnelles : vit dans Supabase, jamais dans le bundle.
+ *
+ * Version 1 : `regionId` et `vehicle`. Version 2 (v2 de l'app) : plus de région (zone déduite des étapes),
+ * `defaultMode` et `profile` ; repères avec nom et position. `validateTripConfig` lit les deux.
  */
 export type TripConfig = {
   id: string;
-  schemaVersion: 1;
+  schemaVersion: 2;
   name: string;
-  regionId: string;
+  /** Mode des nouveaux tronçons. */
+  defaultMode: TravelMode;
   start: TripMilestone;
   end: TripMilestone;
   arrival?: TripMilestone;
-  vehicle: Vehicle;
+  profile: TravelProfile;
   /** Hébergements réservés (pins teal), fusionnés au catalogue public. */
   stays: CatalogPlace[];
   /** Ordre des étapes et nuits, rechargeable via le bouton « Plan ». */

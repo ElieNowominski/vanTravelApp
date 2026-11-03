@@ -1,13 +1,13 @@
 import nzPois from "@/data/catalog/nz-south/pois.json";
 import nzTowns from "@/data/catalog/nz-south/towns.json";
-import { DEFAULT_REGION_ID } from "@/lib/regions";
+import { DEFAULT_REGION_ID, regionsContaining } from "@/lib/regions";
 import type { CatalogPlace, PlaceInput, PlaceKind, TripConfig } from "@/lib/types";
 
 export type CatalogEntry = CatalogPlace & { kind: PlaceKind };
 
-/** Catalogue public d'une région + hébergements privés du voyage courant. */
+/** Catalogues publics des régions traversées + hébergements privés du voyage courant. */
 export type Catalog = {
-  regionId: string;
+  regionIds: string[];
   towns: CatalogPlace[];
   pois: CatalogPlace[];
   stays: CatalogPlace[];
@@ -17,10 +17,42 @@ const PUBLIC_CATALOG: Record<string, { towns: CatalogPlace[]; pois: CatalogPlace
   "nz-south": { towns: nzTowns as CatalogPlace[], pois: nzPois as CatalogPlace[] },
 };
 
+/** Points connus d'un voyage sans ses étapes : repères positionnés et hébergements. */
+function configPoints(config: TripConfig): Array<{ lng: number; lat: number }> {
+  const milestones = [config.start, config.end, config.arrival].flatMap((m) =>
+    m && typeof m.lng === "number" && typeof m.lat === "number" ? [{ lng: m.lng, lat: m.lat }] : [],
+  );
+  return [...milestones, ...config.stays];
+}
+
+/**
+ * Régions dont le catalogue public s'applique : celles que touche le voyage. Sans voyage (écran de création),
+ * la région par défaut, seule à avoir un catalogue tant que la recherche de lieux n'existe pas (lot 3).
+ */
+export function catalogRegionIds(config: TripConfig | null | undefined): string[] {
+  if (!config) return [DEFAULT_REGION_ID];
+  return regionsContaining(configPoints(config)).filter((id) => PUBLIC_CATALOG[id]);
+}
+
 export function buildCatalog(config: TripConfig | null | undefined): Catalog {
-  const regionId = config?.regionId ?? DEFAULT_REGION_ID;
-  const pub = PUBLIC_CATALOG[regionId] ?? { towns: [], pois: [] };
-  return { regionId, towns: pub.towns, pois: pub.pois, stays: config?.stays ?? [] };
+  const regionIds = catalogRegionIds(config);
+  const pubs = regionIds.map((id) => PUBLIC_CATALOG[id]);
+  return {
+    regionIds,
+    towns: pubs.flatMap((pub) => pub.towns),
+    pois: pubs.flatMap((pub) => pub.pois),
+    stays: config?.stays ?? [],
+  };
+}
+
+/** Lieu d'un catalogue public : dans une région donnée (repère d'un voyage v1), sinon dans toutes. */
+export function findPublicPlace(placeId: string, regionId?: string): CatalogPlace | null {
+  const pubs = regionId ? [PUBLIC_CATALOG[regionId]].filter(Boolean) : Object.values(PUBLIC_CATALOG);
+  for (const pub of pubs) {
+    const place = pub.towns.find((p) => p.id === placeId) ?? pub.pois.find((p) => p.id === placeId);
+    if (place) return place;
+  }
+  return null;
 }
 
 export function allCatalogPlaces(catalog: Catalog): CatalogEntry[] {

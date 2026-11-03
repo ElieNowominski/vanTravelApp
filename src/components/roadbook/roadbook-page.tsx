@@ -7,11 +7,13 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useInstallPrompt } from "@/hooks/use-install-prompt";
 import { useTripBoot } from "@/hooks/use-trip-boot";
-import { DEFAULT_VEHICLE, dayColor } from "@/lib/constants";
+import { dayColor } from "@/lib/constants";
+import { useTripZone } from "@/hooks/use-trip-zone";
+import { legDistanceKm, legDurationSec } from "@/lib/legs";
+import { DEFAULT_PROFILE, TRAVEL_MODE_LABELS } from "@/lib/profiles";
 import { printNeedsBrowser } from "@/lib/pwa";
 import { formatMoney, formatTotals, totalsByCurrency } from "@/lib/expenses";
 import { formatDateRange, formatDayDrive, formatDuration, formatKm, isRestDay } from "@/lib/format";
-import { getRegion } from "@/lib/regions";
 import { sketchDay } from "@/lib/route-sketch";
 import { overnightCaption, stayById } from "@/lib/trip-plan";
 import { cn } from "@/lib/utils";
@@ -24,6 +26,7 @@ import { dayStats, selectedOption, useTripStore } from "@/store/trip-store";
  */
 export function RoadbookPage() {
   const ready = useTripBoot();
+  const { label: zoneName } = useTripZone();
   const config = useTripStore((s) => s.config);
   const days = useTripStore((s) => s.days);
   const stops = useTripStore((s) => s.stops);
@@ -49,8 +52,7 @@ export function RoadbookPage() {
     );
   }
 
-  const region = getRegion(config.regionId);
-  const vehicle = config.vehicle ?? DEFAULT_VEHICLE;
+  const vehicle = config.profile ?? DEFAULT_PROFILE;
   const title = activeSavedName || config.name;
   const totals = days.reduce(
     (acc, _d, i) => {
@@ -107,11 +109,11 @@ export function RoadbookPage() {
         </nav>
 
         <header className="mb-6 border-b pb-4">
-          <p className="text-xs tracking-wide text-muted-foreground uppercase">Roadbook · {region.name}</p>
+          <p className="text-xs tracking-wide text-muted-foreground uppercase">Roadbook{zoneName ? ` · ${zoneName}` : ""}</p>
           <h1 className="text-2xl font-semibold">{title}</h1>
           <p className="text-sm text-muted-foreground">
             {formatDateRange(config.start.date, config.end.date)} · {days.length} jours · {totals.nights} nuits ·{" "}
-            {formatKm(totals.km)} · {formatDuration(totals.sec)} en van
+            {formatKm(totals.km)} · {formatDuration(totals.sec)} de route
           </p>
           <p className="text-sm text-muted-foreground">
             {vehicle.name}
@@ -165,11 +167,12 @@ export function RoadbookPage() {
                       const option = inbound ? selectedOption(inbound) : null;
                       return (
                         <li key={stop.id} className="text-sm">
-                          {option && inbound && (
+                          {inbound && (option || inbound.track === "aucun") && (
                             <p className="text-xs text-muted-foreground">
-                              {stops[inbound.fromStopId]?.name ?? "Départ"} → {stop.name} · {formatKm(option.distanceKm)} ·{" "}
-                              {formatDuration(option.durationVanSec)}
-                              {option.winding ? " · route lente" : ""}
+                              {stops[inbound.fromStopId]?.name ?? "Départ"} → {stop.name}
+                              {inbound.track === "aucun" ? ` · ${TRAVEL_MODE_LABELS[inbound.mode]}` : ""} · {formatKm(legDistanceKm(inbound))} ·{" "}
+                              {formatDuration(legDurationSec(inbound))}
+                              {option?.winding ? " · route lente" : ""}
                             </p>
                           )}
                           <p>

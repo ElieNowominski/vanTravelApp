@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { GeoJSONSource, Map as MapLibreMap, MapMouseEvent, Popup } from "maplibre-gl";
 import { MAP_MAX_ZOOM, MAP_MIN_ZOOM, buildMapStyle } from "@/lib/constants";
 import { absoluteAssetUrl } from "@/lib/base-url";
-import { getRegion } from "@/lib/regions";
+import { initialMapView, tripPoints } from "@/lib/zone";
 import { showReactPopup } from "@/components/react-popup";
 import { useTripStore } from "@/store/trip-store";
 import { boundsFromFeatures, tripRouteFeatures } from "@/lib/compare";
@@ -55,15 +55,15 @@ export function CompareMap({ trips, colors }: { trips: SavedTrip[]; colors: stri
 
       // Worker copié dans public/maplibre/ par scripts/copy-maplibre-worker.mjs.
       maplibregl.setWorkerUrl(absoluteAssetUrl("maplibre/maplibre-gl-worker.mjs"));
-      const region = getRegion(useTripStore.getState().config?.regionId);
+      // v2 : cadrée sur le voyage (zone déduite des étapes, ADR 0003), plus sur une région fixe.
+      const state = useTripStore.getState();
       const map = new maplibregl.Map({
         container: containerRef.current,
         style: buildMapStyle(),
-        center: region.center,
-        zoom: region.zoom,
+        ...initialMapView(tripPoints(state.config, state)),
+        fitBoundsOptions: { padding: 32 },
         minZoom: MAP_MIN_ZOOM,
         maxZoom: MAP_MAX_ZOOM,
-        maxBounds: region.maxBounds,
         renderWorldCopies: false,
         attributionControl: {},
       });

@@ -1,8 +1,8 @@
 import type { StyleSpecification } from "maplibre-gl";
 import { absoluteAssetUrl } from "@/lib/base-url";
-import type { Vehicle } from "@/lib/types";
 
-export const MAP_MIN_ZOOM = 5;
+/** Assez bas pour cadrer un voyage sur plusieurs pays (v2). */
+export const MAP_MIN_ZOOM = 2;
 export const MAP_MAX_ZOOM = 18;
 
 /** Fond OSM raster. Usage interactif uniquement : pas de préchargement (politique OSM). */
@@ -26,15 +26,6 @@ export function buildMapStyle(): StyleSpecification {
     layers: [{ id: "osm", type: "raster", source: "osm" }],
   } as StyleSpecification;
 }
-
-/** Véhicule générique quand le voyage n'en précise pas (voyage créé à la main, ancien circuit). */
-export const DEFAULT_VEHICLE: Vehicle = {
-  name: "Van",
-  selfContained: true,
-  timeFactor: 1.3,
-  windingFactor: 1.15,
-  maxComfortableDriveHours: 4,
-};
 
 /** Identifiant stable de l'étape de départ posée par le voyage. */
 export const START_STOP_ID = "stop-start";

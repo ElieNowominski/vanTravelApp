@@ -11,13 +11,13 @@ import { DayStrip } from "@/components/voyager/day-strip";
 import { ProfileButton, ProfileDialog } from "@/components/voyager/profile-dialog";
 import { TodayCard } from "@/components/voyager/today-card";
 import { VoyagerNav } from "@/components/voyager/voyager-nav";
-import { DEFAULT_VEHICLE } from "@/lib/constants";
+import { useTripZone } from "@/hooks/use-trip-zone";
+import { DEFAULT_PROFILE } from "@/lib/profiles";
 import { expensesForStop, formatTotals, stopCosts, totalsByCurrency } from "@/lib/expenses";
 import { formatDateRange } from "@/lib/format";
 import { isProfileComplete } from "@/lib/profile";
-import { getRegion } from "@/lib/regions";
 import { cn } from "@/lib/utils";
-import { dayIndexForDate, daysBetween, summarizeDay, todayInZone, tripPhase } from "@/lib/voyager";
+import { dayIndexForDate, daysBetween, summarizeDay, tripPhase } from "@/lib/voyager";
 import { useProfileStore } from "@/store/profile-store";
 import { useTripStore } from "@/store/trip-store";
 
@@ -33,8 +33,7 @@ export function VoyagerApp() {
   const profile = useProfileStore((s) => s.profile);
   const profileHydrated = useProfileStore((s) => s.hydrated);
 
-  const region = getRegion(config?.regionId);
-  const today = todayInZone(region.timeZone);
+  const { label: zoneName, today } = useTripZone();
   const todayIndex = dayIndexForDate(days, today);
   const phase = config ? tripPhase(config, today) : "before";
   // Le jour choisi survit à un passage par une fiche d'étape (store, non persisté) ; sinon aujourd'hui.
@@ -58,7 +57,7 @@ export function VoyagerApp() {
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
             <p className="truncate text-xs tracking-wide text-muted-foreground uppercase">
-              {region.name} · {formatDateRange(config.start.date, config.end.date)}
+              {zoneName ? `${zoneName} · ` : ""}{formatDateRange(config.start.date, config.end.date)}
             </p>
             <h1 className="truncate font-heading text-lg leading-tight">{config.name}</h1>
           </div>
@@ -96,7 +95,7 @@ export function VoyagerApp() {
                   Revenir à aujourd’hui
                 </Button>
               )}
-              <TodayCard summary={summary} isToday={selected === todayIndex} vehicle={config.vehicle ?? DEFAULT_VEHICLE} />
+              <TodayCard summary={summary} isToday={selected === todayIndex} vehicle={config.profile ?? DEFAULT_PROFILE} />
               <section className="flex flex-col gap-2">
                 <div className="flex items-baseline justify-between gap-2">
                   <h3 className="text-sm font-medium">Étapes du jour</h3>

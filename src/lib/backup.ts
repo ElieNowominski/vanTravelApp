@@ -1,5 +1,5 @@
 import { buildSavedTrip, listSavedTrips, putSavedTrip } from "@/lib/trip-library";
-import { configFromSnapshot, isTripConfig } from "@/lib/trip-config";
+import { configFromSnapshot, normalizeTripConfig } from "@/lib/trip-config";
 import { normalizeMarks } from "@/lib/trip-marks";
 import { migrateSnapshot } from "@/lib/migrations";
 import { blobToDataUrl, dataUrlToBlob, getDocumentBlob, putDocumentBlob } from "@/lib/document-store";
@@ -183,7 +183,7 @@ export async function restoreBackup(backup: BackupFile): Promise<RestoreReport> 
   for (const raw of backup.savedTrips) {
     const trip: SavedTrip = {
       ...raw,
-      config: isTripConfig(raw.config) ? raw.config : configFromSnapshot(raw, { name: raw.name }),
+      config: normalizeTripConfig(raw.config) ?? configFromSnapshot(raw, { name: raw.name }),
     };
     report.trips.push(trip);
     const local = byId.get(trip.id);
@@ -239,7 +239,7 @@ function parseDraft(value: unknown): BackupDraft | null {
     marks: normalizeMarks(state.marks as TripMark[] | undefined),
     activeSavedId: typeof state.activeSavedId === "string" ? state.activeSavedId : null,
     activeSavedName: typeof state.activeSavedName === "string" ? state.activeSavedName : null,
-    config: isTripConfig(state.config) ? state.config : null,
+    config: normalizeTripConfig(state.config),
   };
 }
 
@@ -265,7 +265,7 @@ function hydrateSavedTrip(trip: SavedTrip): SavedTrip {
     ...migrateSnapshot(trip),
     savedAt: typeof trip.savedAt === "string" ? trip.savedAt : new Date(0).toISOString(),
     marks: normalizeMarks(trip.marks),
-    config: isTripConfig(trip.config) ? trip.config : null,
+    config: normalizeTripConfig(trip.config),
   };
 }
 

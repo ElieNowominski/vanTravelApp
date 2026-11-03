@@ -1,5 +1,6 @@
+import { legDistanceKm, legDurationSec } from "@/lib/legs";
 import { isIosUserAgent } from "@/lib/pwa";
-import type { Booking, Leg, RouteOption, Stop, TripConfig, TripDay, TripSnapshot } from "@/lib/types";
+import type { Booking, Stop, TripConfig, TripDay, TripSnapshot } from "@/lib/types";
 
 export type AppMode = "plan" | "travel";
 
@@ -55,10 +56,6 @@ export function dayIndexForDate(days: Pick<TripDay, "date">[], today: string): n
   return days.length - 1;
 }
 
-function selected(leg: Leg): RouteOption | null {
-  return leg.options[leg.selectedIndex] ?? leg.options[0] ?? null;
-}
-
 function lastStopOfDay(snapshot: Pick<TripSnapshot, "days" | "stops">, dayIndex: number): Stop | null {
   const ids = snapshot.days[dayIndex]?.stopIds ?? [];
   const lastId = ids[ids.length - 1];
@@ -102,8 +99,8 @@ export function summarizeDay(snapshot: Pick<TripSnapshot, "days" | "stops" | "le
   const nextStop = stops.find((stop) => stop.id !== departure?.id) ?? null;
   const overnight = day.overnightStopId ? (snapshot.stops[day.overnightStopId] ?? null) : null;
   const dayLegs = snapshot.legs.filter((leg) => leg.dayIndex === dayIndex);
-  const driveSec = dayLegs.reduce((sum, leg) => sum + (selected(leg)?.durationVanSec ?? 0), 0);
-  const km = dayLegs.reduce((sum, leg) => sum + (selected(leg)?.distanceKm ?? 0), 0);
+  const driveSec = dayLegs.reduce((sum, leg) => sum + legDurationSec(leg), 0);
+  const km = dayLegs.reduce((sum, leg) => sum + legDistanceKm(leg), 0);
   return {
     dayIndex,
     day,

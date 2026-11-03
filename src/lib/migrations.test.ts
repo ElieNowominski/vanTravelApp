@@ -165,3 +165,75 @@ describe("v4 : portée des documents, étape des dépenses, documents de voyage"
     expect(normalizeExpenses([{ amount: 1, stopId: "x" }])[0].stopId).toBe("x");
   });
 });
+
+describe("v5 : modes de déplacement et tronçons", () => {
+  const geometry = { type: "LineString" as const, coordinates: [[172.6, -43.5], [170.4, -44]] };
+  /** Tronçon tel qu'enregistré par la v1 (schéma 4) : durées voiture et van, pas de mode. */
+  const v4Leg = {
+    id: "l1",
+    fromStopId: "s1",
+    toStopId: "s2",
+    dayIndex: 0,
+    options: [{ geometry, distanceKm: 250, durationCarSec: 10_000, durationVanSec: 13_000, winding: true, label: "Recommandée" }],
+    selectedIndex: 0,
+    estimated: false,
+  };
+
+  it("passe un tronçon v4 en « van » calculé, durées renommées", () => {
+    const migrated = migrateSnapshot({ ...v1, legs: [v4Leg] } as unknown as Partial<TripSnapshot>);
+    expect(migrated.schemaVersion).toBe(5);
+    expect(migrated.legs).toEqual([
+      {
+        id: "l1",
+        fromStopId: "s1",
+        toStopId: "s2",
+        dayIndex: 0,
+        mode: "van",
+        track: "calcule",
+        options: [{ geometry, distanceKm: 250, durationRawSec: 10_000, durationSec: 13_000, winding: true, label: "Recommandée" }],
+        selectedIndex: 0,
+        estimated: false,
+      },
+    ]);
+  });
+
+  it("est idempotente sur un tronçon v5 et garde un tronçon manuel sans tracé", () => {
+    const ferry = {
+      id: "l2",
+      fromStopId: "s2",
+      toStopId: "s3",
+      dayIndex: 1,
+      mode: "ferry",
+      track: "aucun",
+      options: [],
+      selectedIndex: 0,
+      estimated: false,
+      manual: { durationSec: 11_700, operator: "Traversée de démonstration", departAt: "08 h 00", extra: "ignoré" },
+    };
+    const once = migrateSnapshot({ ...v1, legs: [v4Leg, ferry] } as unknown as Partial<TripSnapshot>);
+    const twice = migrateSnapshot(once);
+    expect(twice.legs).toEqual(once.legs);
+    expect(once.legs[1]).toMatchObject({ mode: "ferry", track: "aucun", options: [] });
+    expect(once.legs[1].manual).toEqual({ durationSec: 11_700, operator: "Traversée de démonstration", departAt: "08 h 00" });
+  });
+
+  it("écarte un tronçon sans étapes, ramène un mode inconnu au van et un index hors limites à 0", () => {
+    const migrated = migrateSnapshot({
+      ...v1,
+      legs: [
+        { id: "x", fromStopId: "s1" },
+        { ...v4Leg, id: "l3", mode: "trottinette", selectedIndex: 4 },
+        "n'importe quoi",
+      ],
+    } as unknown as Partial<TripSnapshot>);
+    expect(migrated.legs.map((l) => [l.id, l.mode, l.selectedIndex])).toEqual([["l3", "van", 0]]);
+  });
+
+  it("déduit « aucun » d'un tronçon manuel sans tracé ni type", () => {
+    const migrated = migrateSnapshot({
+      ...v1,
+      legs: [{ id: "l4", fromStopId: "s1", toStopId: "s2", dayIndex: 0, mode: "train", options: [], manual: { durationSec: 3600 } }],
+    } as unknown as Partial<TripSnapshot>);
+    expect(migrated.legs[0]).toMatchObject({ mode: "train", track: "aucun", manual: { durationSec: 3600 } });
+  });
+});

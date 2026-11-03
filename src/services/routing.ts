@@ -1,6 +1,6 @@
 import { haversineKm, straightLine } from "@/lib/geo";
-import type { RouteOption, Vehicle } from "@/lib/types";
-import { fallbackRoute, vanDurationSec, type TimeFactors } from "@/lib/van-time";
+import type { RouteOption, TravelProfile } from "@/lib/types";
+import { fallbackRoute, profileDurationSec, type TimeFactors } from "@/lib/travel-time";
 
 type Point = { lng: number; lat: number };
 
@@ -18,34 +18,34 @@ const OSRM_URL = "https://router.project-osrm.org/route/v1/driving";
 const TIMEOUT_MS = 15_000;
 
 /** Itinéraire routier depuis le navigateur ; estimation à vol d'oiseau si le réseau manque. */
-export async function routeBetween(from: Point, to: Point, vehicle: Vehicle): Promise<RoutingResult> {
+export async function routeBetween(from: Point, to: Point, profile: TravelProfile): Promise<RoutingResult> {
   try {
-    const options = await routeOsrm(from, to, vehicle);
-    if (options.length === 0) return { options: [estimate(from, to, vehicle)], estimated: true };
+    const options = await routeOsrm(from, to, profile);
+    if (options.length === 0) return { options: [estimate(from, to, profile)], estimated: true };
     return { options, estimated: false };
   } catch (error) {
     return {
-      options: [estimate(from, to, vehicle)],
+      options: [estimate(from, to, profile)],
       estimated: true,
       warning: error instanceof Error ? error.message : "Routage indisponible",
     };
   }
 }
 
-export function estimate(from: Point, to: Point, vehicle: TimeFactors): RouteOption {
+export function estimate(from: Point, to: Point, profile: TimeFactors): RouteOption {
   const km = haversineKm(from, to);
-  const fallback = fallbackRoute(km, vehicle);
+  const fallback = fallbackRoute(km, profile);
   return {
     geometry: straightLine(from, to),
     distanceKm: fallback.distanceKm,
-    durationCarSec: fallback.durationCarSec,
-    durationVanSec: fallback.durationVanSec,
+    durationRawSec: fallback.durationRawSec,
+    durationSec: fallback.durationSec,
     winding: fallback.winding,
     label: "Estimation (hors réseau routier)",
   };
 }
 
-async function routeOsrm(from: Point, to: Point, vehicle: TimeFactors): Promise<RouteOption[]> {
+async function routeOsrm(from: Point, to: Point, profile: TimeFactors): Promise<RouteOption[]> {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     throw new Error("Hors ligne");
   }
@@ -59,22 +59,22 @@ async function routeOsrm(from: Point, to: Point, vehicle: TimeFactors): Promise<
     routes?: Array<{ distance: number; duration: number; geometry: GeoJSON.LineString }>;
   };
   if (data.code !== "Ok" || !data.routes?.length) throw new Error("OSRM sans itinéraire");
-  return data.routes.slice(0, 3).map((route, index) => toOption(route, index, vehicle));
+  return data.routes.slice(0, 3).map((route, index) => toOption(route, index, profile));
 }
 
 function toOption(
   route: { distance: number; duration: number; geometry: GeoJSON.LineString },
   index: number,
-  vehicle: TimeFactors,
+  profile: TimeFactors,
 ): RouteOption {
   const distanceKm = route.distance / 1000;
-  const van = vanDurationSec(route.duration, distanceKm, vehicle);
+  const adjusted = profileDurationSec(route.duration, distanceKm, profile);
   return {
     geometry: route.geometry,
     distanceKm,
-    durationCarSec: route.duration,
-    durationVanSec: van.durationVanSec,
-    winding: van.winding,
+    durationRawSec: route.duration,
+    durationSec: adjusted.durationSec,
+    winding: adjusted.winding,
     label: index === 0 ? "Recommandée" : `Alternative ${index}`,
   };
 }

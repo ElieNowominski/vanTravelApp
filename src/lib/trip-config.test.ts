@@ -81,7 +81,8 @@ describe("configFromSnapshot", () => {
     expect(config?.start).toMatchObject({ placeId: "christchurch", date: "2027-02-07" });
     expect(config?.end.date).toBe("2027-02-08");
     expect(config?.stays.map((s) => s.id)).toEqual(["camp-du-lac"]);
-    expect(config?.regionId).toBe("nz-south");
+    expect(config?.schemaVersion).toBe(2);
+    expect(config?.start).toMatchObject({ name: "Christchurch", lng: 172.6, lat: -43.5 });
   });
 
   it("renvoie null sans jour", () => {
@@ -97,7 +98,7 @@ describe("validateTripConfig", () => {
       start: { placeId: "christchurch", date: "2027-02-07" },
       end: { placeId: "christchurch", date: "2027-02-19" },
     });
-    expect(config.vehicle.timeFactor).toBe(1.3);
+    expect(config.profile.timeFactor).toBe(1.3);
     expect(config.stays).toEqual([]);
     expect(config.plan.days).toEqual([]);
   });
@@ -122,5 +123,47 @@ describe("validateTripConfig", () => {
         end: { placeId: "a", date: "2027-02-19" },
       }),
     ).toThrow(/AAAA-MM-JJ/);
+  });
+});
+
+describe("voyage v1 vers v2", () => {
+  const v1Config = {
+    id: "trip-v1",
+    schemaVersion: 1,
+    name: "Voyage v1",
+    regionId: "nz-south",
+    start: { placeId: "christchurch", date: "2027-02-07" },
+    end: { placeId: "christchurch", date: "2027-02-19" },
+    vehicle: { name: "Van", selfContained: true, timeFactor: 1.3, windingFactor: 1.15, maxComfortableDriveHours: 4 },
+    stays: [],
+    plan: { days: [] },
+  };
+
+  it("retire la région, positionne les repères depuis le catalogue et fait du véhicule un profil van", () => {
+    const config = validateTripConfig(v1Config);
+    expect(config.schemaVersion).toBe(2);
+    expect("regionId" in config).toBe(false);
+    expect("vehicle" in config).toBe(false);
+    expect(config.defaultMode).toBe("van");
+    expect(config.profile).toMatchObject({ presetId: "van", mode: "van", name: "Van", timeFactor: 1.3 });
+    expect(config.start).toEqual({ placeId: "christchurch", date: "2027-02-07", name: "Christchurch", lng: 172.6362, lat: -43.5321 });
+  });
+
+  it("est idempotente et garde un repère hors catalogue positionné", () => {
+    const once = validateTripConfig(v1Config);
+    expect(validateTripConfig(once)).toEqual(once);
+    const anywhere = validateTripConfig({
+      ...once,
+      start: { placeId: "brest", name: "Brest", lng: -4.49, lat: 48.39, date: "2027-07-01" },
+      end: { placeId: "brest", name: "Brest", lng: -4.49, lat: 48.39, date: "2027-07-10" },
+      defaultMode: "velo",
+    });
+    expect(anywhere.start).toMatchObject({ name: "Brest", lng: -4.49, lat: 48.39 });
+    expect(anywhere.defaultMode).toBe("velo");
+  });
+
+  it("un repère v2 inconnu du catalogue reste sans position plutôt que d'être placé en Nouvelle-Zélande", () => {
+    const config = validateTripConfig({ ...v1Config, schemaVersion: 2, start: { placeId: "christchurch", date: "2027-02-07" } });
+    expect(config.start.lng).toBeUndefined();
   });
 });

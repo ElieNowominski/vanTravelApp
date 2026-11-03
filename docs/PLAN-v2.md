@@ -18,7 +18,7 @@ Prompt de reprise :
 ## État
 
 - [x] Lot 0 : préversion locale et projet Supabase dédié (3 nov. 2026 : port 43218, `.env.next.local`, projet `vanTravelApp-v2`, `rls-check` 37/37)
-- [ ] Lot 1 : modèle v5 et voyage fictif de référence
+- [x] Lot 1 : modèle v5 et voyage fictif de référence (3 nov. 2026 : 141 tests, parcours vérifié dans le navigateur)
 - [ ] Lot 2 : schéma Supabase (rôles, plafonds)
 - [ ] Lot 3 : géographie libre (recherche de lieux, fin de la région unique)
 - [ ] Lot 4 : routage par tronçon
@@ -50,12 +50,13 @@ Options :
 
 ## Lot 1 : modèle v5 et voyage fictif de référence
 
-- [ ] Tronçon explicite entre deux étapes : mode (`van`, `voiture`, `moto`, `train`, `ferry`, `velo`, `marche`), tracé calculé, importé ou absent, durée et distance (ADR 0002). Mode par défaut au niveau du voyage.
-- [ ] Profil de déplacement à la place de `Vehicle`, copié depuis des préréglages commités (van aménagé, camping-car, voiture, moto) puis ajustable dans le voyage.
-- [ ] Étape : fuseau horaire et pays calculés depuis les coordonnées, hors ligne (bibliothèque embarquée, poids à mesurer avant de choisir) ; zone du voyage (emprise, pays) calculée depuis les étapes (ADR 0003).
-- [ ] `regionId` retiré de `TripConfig` au profit de la zone calculée ; `RegionPreset` ne sert plus qu'à la migration.
-- [ ] Migration v4 -> v5 dans `src/lib`, testée sur une sauvegarde fictive au format v4 : le voyage NZ devient « mode van, zone calculée », sans perte.
-- [ ] Voyage fictif de référence commité (aucune donnée personnelle) : Oslo, Bergen, Stockholm sur 10 jours, en van, trois pays, trois devises, un ferry, trois participants. Sert aux tests Vitest et aux parcours dans le navigateur.
+- [x] Tronçon explicite : `mode`, `track` (`calcule`, `importe`, `aucun`), `manual` pour un tronçon sans tracé ; `legDurationSec` et `legDistanceKm` (`src/lib/legs.ts`) partout où l'on additionnait la durée « van ». `defaultMode` dans le voyage. La ligne d'un tronçon sans tracé s'affiche dans l'itinéraire et le roadbook (« Ferry · 3 h 15 · 140 km »).
+- [x] `TravelProfile` à la place de `Vehicle`, préréglages van aménagé, camping-car, voiture, moto (`src/lib/profiles.ts`) ; `van-time.ts` devient `travel-time.ts`.
+- [x] Fuseau et pays par point, hors ligne : `@photostructure/tz-lookup` 11.7.0 (29 Ko compressés) et `@rapideditor/country-coder` 5.6.1 (225 Ko), regroupés dans un module chargé à la demande (259 Ko, précaché). Zone du voyage, libellé (« Danemark, Norvège, Suède »), cadre de carte et date du jour en voyage dans `src/lib/zone.ts`. **Écart au cadrage (Q21)** : fuseau et pays ne sont pas stockés sur l'étape mais calculés à la lecture. Stockés, ils auraient modifié l'itinéraire de chaque voyage existant au premier chargement, donc une écriture à synchroniser depuis chaque appareil, et auraient été faux après le déplacement d'une étape ; la bibliothèque étant précachée, le calcul marche hors ligne.
+- [x] `regionId` retiré de `TripConfig` (voyage v2), repères positionnés ; cartes cadrées sur le voyage (zoom minimal 2, plus de `maxBounds`) ; devise proposée = dernière saisie, l'euro sinon (anticipé du lot 7, la région ne la donnait plus) ; catalogue et calques DOC activés seulement si le voyage touche la Nouvelle-Zélande, calques masqués sinon.
+- [x] Migrations : snapshot v4 -> v5 (`normalizeLegs`), voyage v1 -> v2 (`validateTripConfig`), sur le brouillon, la bibliothèque, les sauvegardes et la synchro ; testées sur des données v4 et v1 fictives (un voyage v1 de la Nouvelle-Zélande devient « van » avec des repères positionnés depuis le catalogue).
+- [x] Voyage fictif de référence `fixtures/reference-scandinavie.json` (`scripts/make-reference-trip.mjs`, tracés OSRM) : Copenhague, Aarhus, ferry Hirtshals -> Kristiansand, Stavanger, Odda, Bergen, Flåm, Oslo, Karlstad, Stockholm ; 10 jours, 9 nuits, 2 223 km, trois pays, quatre devises (DKK, EUR, NOK, SEK), trois participants. Écart : départ de Copenhague pour avoir un ferry réaliste et un troisième pays. Testé (`reference-trip.test.ts`) et parcouru dans le navigateur (import, Planifier, Voyager, nouvelle dépense, roadbook, 375 px).
+- Reste pour les lots suivants : l'écran de création ne propose encore que le catalogue néo-zélandais (lots 3 et 6) ; un tronçon train ou ferry ne se crée pas encore dans l'app et n'est pas dessiné sur la carte (lot 4).
 
 ## Lot 2 : schéma Supabase
 

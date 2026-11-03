@@ -1,4 +1,4 @@
-import { DEFAULT_VEHICLE } from "@/lib/constants";
+import { DEFAULT_PROFILE } from "@/lib/profiles";
 import type { SavedTrip } from "@/lib/types";
 import { selectedOption, dayStats } from "@/store/trip-store";
 
@@ -34,7 +34,7 @@ export function compareStats(trip: SavedTrip): CompareStats {
     driveSec += stats.driveSec;
     stopCount += stats.stopCount;
     if (stats.overnight) nights += 1;
-    const maxHours = trip.config?.vehicle.maxComfortableDriveHours ?? DEFAULT_VEHICLE.maxComfortableDriveHours;
+    const maxHours = trip.config?.profile.maxComfortableDriveHours ?? DEFAULT_PROFILE.maxComfortableDriveHours;
     if (stats.driveSec / 3600 > maxHours) longDays += 1;
     const used = stats.stopCount > 0 || Boolean(stats.overnight);
     if (used) {

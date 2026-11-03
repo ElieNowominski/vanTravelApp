@@ -1,5 +1,5 @@
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   GeoJSONSource,
   LngLat,
@@ -8,13 +8,14 @@ import type {
   MapMouseEvent,
   Popup,
 } from "maplibre-gl";
-import { buildCatalog, type Catalog } from "@/lib/catalog";
+import { buildCatalog, catalogRegionIds, type Catalog } from "@/lib/catalog";
+import { DEFAULT_REGION_ID } from "@/lib/regions";
 import { asPointCollection } from "@/lib/geo";
 import { amenityChips, amenitiesFromProperties, amenitySummary } from "@/lib/amenities";
 import { dayColor, MAP_MAX_ZOOM, MAP_MIN_ZOOM, buildMapStyle } from "@/lib/constants";
 import { setActiveMap } from "@/lib/map-registry";
 import { absoluteAssetUrl } from "@/lib/base-url";
-import { getRegion } from "@/lib/regions";
+import { initialMapView, tripPoints } from "@/lib/zone";
 import { loadDataset } from "@/services/datasets";
 import type { CatalogPlace, LayersState, PlaceInput, PlaceKind } from "@/lib/types";
 import { selectedOption, useTripStore } from "@/store/trip-store";
@@ -206,6 +207,8 @@ export function TripMap() {
   const routingStatus = useTripStore((s) => s.routingStatus);
   const routingMessage = useTripStore((s) => s.routingMessage);
   const config = useTripStore((s) => s.config);
+  // Calques DOC : propres à la Nouvelle-Zélande, chargés seulement si le voyage y passe (ADR 0003).
+  const nzSources = useMemo(() => catalogRegionIds(config).includes(DEFAULT_REGION_ID), [config]);
 
   const [camps, setCamps] = useState<GeoJSON.FeatureCollection | null>(null);
   const [osmCamps, setOsmCamps] = useState<GeoJSON.FeatureCollection | null>(null);
@@ -228,15 +231,15 @@ export function TripMap() {
 
       // Worker copié dans public/maplibre/ par scripts/copy-maplibre-worker.mjs.
       maplibregl.setWorkerUrl(absoluteAssetUrl("maplibre/maplibre-gl-worker.mjs"));
-      const region = getRegion(useTripStore.getState().config?.regionId);
+      // v2 : cadrée sur le voyage (zone déduite des étapes, ADR 0003), plus sur une région fixe.
+      const state = useTripStore.getState();
       const map = new maplibregl.Map({
         container: containerRef.current,
         style: buildMapStyle(),
-        center: region.center,
-        zoom: region.zoom,
+        ...initialMapView(tripPoints(state.config, state)),
+        fitBoundsOptions: { padding: 32 },
         minZoom: MAP_MIN_ZOOM,
         maxZoom: MAP_MAX_ZOOM,
-        maxBounds: region.maxBounds,
         renderWorldCopies: false,
         attributionControl: {},
         interactive: true,
@@ -378,6 +381,7 @@ export function TripMap() {
   }, [pinMode]);
 
   useEffect(() => {
+    if (!nzSources) return;
     let cancelled = false;
     loadDataset("doc-campsites")
       .then((data) => {
@@ -389,7 +393,7 @@ export function TripMap() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [nzSources]);
 
   useEffect(() => {
     let cancelled = false;
@@ -406,6 +410,7 @@ export function TripMap() {
   }, []);
 
   useEffect(() => {
+    if (!nzSources) return;
     let cancelled = false;
     loadDataset("doc-freedom")
       .then((data) => {
@@ -417,7 +422,7 @@ export function TripMap() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [nzSources]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -440,7 +445,7 @@ export function TripMap() {
           Carte : {mapError}
         </div>
       )}
-      <LayerControls campsLoading={!camps && !campsError} osmCampsLoading={!osmCamps && !osmCampsError} />
+      <LayerControls campsLoading={!camps && !campsError} osmCampsLoading={!osmCamps && !osmCampsError} nzSources={nzSources} />
       <DatasetNotice
         problems={[
           campsError ? { label: "Campings DOC", message: campsError } : null,

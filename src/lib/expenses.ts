@@ -51,6 +51,15 @@ export type TripExpenseTotals = {
   byCategory: Record<string, MoneyByCurrency>;
 };
 
+/** Devise proposée pour une nouvelle dépense : celle de la dernière saisie, l'euro pour la première (Q19 du cadrage). */
+export function defaultExpenseCurrency(expenses: Pick<Expense, "currency" | "updatedAt">[]): string {
+  let latest: Pick<Expense, "currency" | "updatedAt"> | null = null;
+  for (const expense of expenses) {
+    if (!latest || expense.updatedAt > latest.updatedAt) latest = expense;
+  }
+  return latest?.currency || "EUR";
+}
+
 export function tripExpenseTotals(days: Pick<TripDay, "expenses">[]): TripExpenseTotals {
   const expenses = allExpenses(days);
   const byPayer: Record<string, MoneyByCurrency> = {};

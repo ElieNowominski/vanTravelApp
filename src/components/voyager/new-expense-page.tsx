@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Chips } from "@/components/voyager/chips";
 import { VoyagerFrame } from "@/components/voyager/voyager-frame";
 import { useBack } from "@/hooks/use-back";
-import { EXPENSE_CATEGORIES, allExpenses, parseAmount } from "@/lib/expenses";
+import { useTripZone } from "@/hooks/use-trip-zone";
+import { EXPENSE_CATEGORIES, allExpenses, defaultExpenseCurrency, parseAmount } from "@/lib/expenses";
 import { tripPeople } from "@/lib/profile";
-import { getRegion } from "@/lib/regions";
 import type { ExpenseCategory } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { dayIndexForDate, todayInZone } from "@/lib/voyager";
+import { dayIndexForDate } from "@/lib/voyager";
 import { useProfileStore } from "@/store/profile-store";
 import { useTripStore } from "@/store/trip-store";
 
@@ -31,7 +31,6 @@ export function NewExpensePage() {
 
 function NewExpenseBody() {
   const [params] = useSearchParams();
-  const config = useTripStore((s) => s.config);
   const days = useTripStore((s) => s.days);
   const stops = useTripStore((s) => s.stops);
   const travelDay = useTripStore((s) => s.travelDay);
@@ -39,16 +38,17 @@ function NewExpenseBody() {
   const profile = useProfileStore((s) => s.profile);
   const back = useBack("/depenses");
 
-  const region = getRegion(config?.regionId);
+  const { today } = useTripZone();
   const everyone = useMemo(() => allExpenses(days), [days]);
+  const proposedCurrency = useMemo(() => defaultExpenseCurrency(everyone), [everyone]);
   const people = useMemo(() => tripPeople(profile, everyone.map((e) => e.paidBy)), [profile, everyone]);
-  const currencies = useMemo(() => [...new Set([region.currency, "EUR", ...everyone.map((e) => e.currency)])], [region.currency, everyone]);
+  const currencies = useMemo(() => [...new Set([proposedCurrency, "EUR", ...everyone.map((e) => e.currency)])], [proposedCurrency, everyone]);
 
   const initialDay = (() => {
     const fromUrl = Number(params.get("jour"));
     if (params.has("jour") && Number.isInteger(fromUrl) && days[fromUrl]) return fromUrl;
     if (travelDay != null && days[travelDay]) return travelDay;
-    return Math.max(0, dayIndexForDate(days, todayInZone(region.timeZone)));
+    return Math.max(0, dayIndexForDate(days, today));
   })();
   const [dayIndex, setDayIndex] = useState(initialDay);
   const day = days[dayIndex];
@@ -62,7 +62,7 @@ function NewExpenseBody() {
   const [stopId, setStopId] = useState(() => defaultStop(initialDay));
 
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState(region.currency);
+  const [currency, setCurrency] = useState(proposedCurrency);
   const [category, setCategory] = useState<ExpenseCategory>("carburant");
   const [paidBy, setPaidBy] = useState(profile.name.trim() || people[0] || "");
   const [note, setNote] = useState("");

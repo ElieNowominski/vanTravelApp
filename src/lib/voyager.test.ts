@@ -47,9 +47,9 @@ const snapshot: TripSnapshot = {
     s4: { ...stop("s4", "Wānaka", true), bookings: [{ id: "b1", updatedAt: "", updatedBy: "", provider: "Lakeview", reference: "R1", accessCode: "1234", phone: "+64 3 443 0000" }] },
   },
   legs: [
-    { id: "l1", fromStopId: "s1", toStopId: "s2", dayIndex: 0, selectedIndex: 0, estimated: false, options: [{ label: "", distanceKm: 226, durationCarSec: 9000, durationVanSec: 11700, winding: false, geometry: { type: "LineString", coordinates: [] } }] },
-    { id: "l2", fromStopId: "s2", toStopId: "s3", dayIndex: 1, selectedIndex: 0, estimated: true, options: [{ label: "", distanceKm: 100, durationCarSec: 4000, durationVanSec: 5200, winding: false, geometry: { type: "LineString", coordinates: [] } }] },
-    { id: "l3", fromStopId: "s3", toStopId: "s4", dayIndex: 1, selectedIndex: 0, estimated: false, options: [{ label: "", distanceKm: 200, durationCarSec: 8000, durationVanSec: 10400, winding: true, geometry: { type: "LineString", coordinates: [] } }] },
+    { id: "l1", fromStopId: "s1", toStopId: "s2", mode: "van", track: "calcule", dayIndex: 0, selectedIndex: 0, estimated: false, options: [{ label: "", distanceKm: 226, durationRawSec: 9000, durationSec: 11700, winding: false, geometry: { type: "LineString", coordinates: [] } }] },
+    { id: "l2", fromStopId: "s2", toStopId: "s3", mode: "van", track: "calcule", dayIndex: 1, selectedIndex: 0, estimated: true, options: [{ label: "", distanceKm: 100, durationRawSec: 4000, durationSec: 5200, winding: false, geometry: { type: "LineString", coordinates: [] } }] },
+    { id: "l3", fromStopId: "s3", toStopId: "s4", mode: "van", track: "calcule", dayIndex: 1, selectedIndex: 0, estimated: false, options: [{ label: "", distanceKm: 200, durationRawSec: 8000, durationSec: 10400, winding: true, geometry: { type: "LineString", coordinates: [] } }] },
   ],
 };
 

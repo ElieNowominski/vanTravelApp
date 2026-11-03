@@ -29,9 +29,11 @@ import { TripMarksEditor } from "@/components/trip-marks-editor";
 import { StopActivitiesEditor } from "@/components/stop-activities-editor";
 import { buildCatalog, placeToInput, searchCatalog } from "@/lib/catalog";
 import { captureTripMapImage } from "@/lib/capture-map";
-import { DEFAULT_VEHICLE, START_STOP_ID, dayColor } from "@/lib/constants";
+import { START_STOP_ID, dayColor } from "@/lib/constants";
+import { useTripZone } from "@/hooks/use-trip-zone";
+import { legDistanceKm, legDurationSec } from "@/lib/legs";
+import { DEFAULT_PROFILE, TRAVEL_MODE_LABELS } from "@/lib/profiles";
 import { getActiveMap } from "@/lib/map-registry";
-import { getRegion } from "@/lib/regions";
 import { exportTripPdf } from "@/lib/export-pdf";
 import { formatDateRange, formatDayDrive, formatDuration, formatKm, formatShortDay } from "@/lib/format";
 import { catalogKindLabel, overnightCaption, stayById } from "@/lib/trip-plan";
@@ -64,8 +66,8 @@ export function ItineraryPanel() {
   const frozenAt = useTripStore((s) => s.frozenAt);
   const setUiMode = useTripStore((s) => s.setUiMode);
   const catalog = useMemo(() => buildCatalog(config), [config]);
-  const region = getRegion(config?.regionId);
-  const vehicle = config?.vehicle ?? DEFAULT_VEHICLE;
+  const { label: zoneName } = useTripZone();
+  const vehicle = config?.profile ?? DEFAULT_PROFILE;
 
   const [query, setQuery] = useState("");
   const [exporting, setExporting] = useState(false);
@@ -93,8 +95,7 @@ export function ItineraryPanel() {
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-xs tracking-wide text-muted-foreground uppercase">
-              {region.name}
-              {config ? ` · ${formatDateRange(config.start.date, config.end.date)}` : ""}
+              {[zoneName, config ? formatDateRange(config.start.date, config.end.date) : ""].filter(Boolean).join(" · ")}
             </p>
             <h1 className="font-heading text-lg leading-tight">
               {activeSavedName || config?.name || "Roadtrip van"}
@@ -341,12 +342,13 @@ export function ItineraryPanel() {
                     const open = openStopId === stopId;
                     return (
                       <li key={stopId} className="px-2 py-1.5">
-                        {option && inbound && (
+                        {inbound && (option || inbound.track === "aucun") && (
                           <p className="mb-1 pl-5 text-[11px] text-muted-foreground">
                             {stops[inbound.fromStopId]?.name ?? "Départ"} → {stop.name}
+                            {inbound.track === "aucun" ? ` · ${TRAVEL_MODE_LABELS[inbound.mode]}` : ""}
                             {" · "}
-                            {formatDuration(option.durationVanSec)} van
-                            {option.winding ? " · route lente" : ""} · {formatKm(option.distanceKm)}
+                            {formatDuration(legDurationSec(inbound))}
+                            {option?.winding ? " · route lente" : ""} · {formatKm(legDistanceKm(inbound))}
                             {inbound.estimated ? " · estimé" : ""}
                             {inbound.options.length > 1
                               ? ` · ${inbound.options.length} routes`

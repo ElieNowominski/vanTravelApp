@@ -58,7 +58,7 @@ function snapshot(): TripSnapshot {
       s1: stop("s1", { notes: "Note de planification" }),
       s2: stop("s2", { isOvernight: true, bookings: [booking("b1", T0)], checklist: [{ id: "c1", updatedAt: T0, updatedBy: "Élie", text: "Plein", done: false }] }),
     },
-    legs: [{ id: "l1", fromStopId: "s1", toStopId: "s2", dayIndex: 0, options: [], selectedIndex: 0, estimated: true }],
+    legs: [{ id: "l1", fromStopId: "s1", toStopId: "s2", mode: "van", track: "calcule", dayIndex: 0, options: [], selectedIndex: 0, estimated: true }],
     customPins: [],
     currentDayIndex: 0,
     frozenAt: null,
@@ -138,9 +138,11 @@ describe("itinéraire", () => {
       fromStopId: "s1",
       toStopId: "s2",
       dayIndex: 0,
+      mode: "van" as const,
+      track: "calcule" as const,
       selectedIndex: 0,
       estimated: false,
-      options: [{ geometry: { type: "LineString" as const, coordinates: [[172.636214789, -43.532104321], [170.4647, -44.0008]] }, distanceKm: 1.234567, durationCarSec: 10, durationVanSec: 13, winding: false, label: "A" }],
+      options: [{ geometry: { type: "LineString" as const, coordinates: [[172.636214789, -43.532104321], [170.4647, -44.0008]] }, distanceKm: 1.234567, durationRawSec: 10, durationSec: 13, winding: false, label: "A" }],
     };
     const out = roundLegCoordinates(leg);
     expect(out.options[0].geometry.coordinates).toEqual([[172.63621, -43.5321], [170.4647, -44.0008]]);

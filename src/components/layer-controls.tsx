@@ -5,6 +5,9 @@ import { Label } from "@/components/ui/label";
 import { useTripStore } from "@/store/trip-store";
 import type { LayerKey } from "@/lib/types";
 
+/** Calques propres à la Nouvelle-Zélande (DOC), masqués quand le voyage n'y passe pas. */
+const NZ_ONLY: LayerKey[] = ["camps", "freedom"];
+
 const ITEMS: Array<{ key: LayerKey; label: string; hint: string }> = [
   { key: "towns", label: "Villes", hint: "Cliquables" },
   { key: "pois", label: "Spots", hint: "Catalogue" },
@@ -17,9 +20,11 @@ const ITEMS: Array<{ key: LayerKey; label: string; hint: string }> = [
 export function LayerControls({
   campsLoading,
   osmCampsLoading,
+  nzSources = true,
 }: {
   campsLoading?: boolean;
   osmCampsLoading?: boolean;
+  nzSources?: boolean;
 }) {
   const layers = useTripStore((s) => s.layers);
   const setLayer = useTripStore((s) => s.setLayer);
@@ -37,7 +42,7 @@ export function LayerControls({
       </button>
       {open && (
         <div className="flex flex-col gap-2">
-          {ITEMS.map((item) => (
+          {ITEMS.filter((item) => nzSources || !NZ_ONLY.includes(item.key)).map((item) => (
             <div key={item.key} className="flex items-center justify-between gap-3">
               <Label htmlFor={`layer-${item.key}`} className="flex flex-col gap-0">
                 <span>{item.label}</span>
@@ -51,7 +56,7 @@ export function LayerControls({
               />
             </div>
           ))}
-          {layers.camps && campsLoading && (
+          {nzSources && layers.camps && campsLoading && (
             <p className="text-xs text-muted-foreground">Chargement des campings DOC…</p>
           )}
           {layers.osmCamps && osmCampsLoading && (
