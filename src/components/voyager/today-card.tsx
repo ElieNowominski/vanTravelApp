@@ -5,6 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DirectionsButtons } from "@/components/voyager/directions-buttons";
+import { RoutePois } from "@/components/voyager/route-pois";
 import { LockedSecret, SecretField } from "@/components/voyager/secret-field";
 import { useDraftField } from "@/hooks/use-draft-field";
 import { formatMoney } from "@/lib/expenses";
@@ -88,6 +89,8 @@ export function TodayCard({ summary, isToday, vehicle }: { summary: DaySummary; 
           </div>
         )}
       </section>
+
+      <RoutePois dayIndex={dayIndex} />
 
       <section className="rounded-xl bg-primary/5 p-3 ring-1 ring-primary/20">
         <div className="flex items-center justify-between gap-2">

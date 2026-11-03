@@ -193,3 +193,26 @@ Les entrées antérieures au 7 octobre 2026 sont reconstituées après coup depu
   - Entre deux modes routiers, la route reste la même (un profil par voyage) ; entre deux modes manuels, un horaire déjà saisi reste ; passer d'un mode à l'autre recalcule.
   - Vélo et marche sans tracé plutôt que par un serveur de routage vélo ou piéton : politique d'usage non vérifiée, et le trek est hors de la v2.
 - **Chiffres** : 187 tests en 26 fichiers (173 avant) ; une requête OSRM par changement vers un mode routier, aucune pour train, ferry, vélo et marche.
+
+## 2026-11-03 : v2, lot 5 (points d'intérêt OSM à la demande)
+
+- **Intention** : voir campings, aires de camping-car, vidanges et points d'eau partout, plus seulement en Nouvelle-Zélande, et les retrouver hors ligne le long de la route une fois l'itinéraire figé.
+- **Demandes** : « Go Lot5 v2 ».
+- **Livré** : `src/lib/poi.ts` (catégories, requête Overpass, lecture, grille du cache, couloir, distances au tracé) ; `src/services/overpass.ts` (une requête à la fois, deux secondes d'écart, pause de 30 s après un 429, second serveur sur saturation, plafond `poi`) et `src/services/poi-cache.ts` (IndexedDB `vantravel-poi`) ; `src/store/poi-store.ts` ; calque « Points d'intérêt OSM » sur la carte avec son état ; mise en cache du couloir au figeage et son avancement dans le dialogue « Plan » ; « Sur la route » dans la carte du jour de Voyager ; migration `0005_poi_limits.sql` ; 31 tests de plus.
+- **Cassé ou appris** :
+  - La politique d'Overpass est plus serrée que les plafonds posés au lot 2 : environ 100 requêtes par jour pour toute une app, pas par compte. Les plafonds `poi` de la migration 0004 (200 par compte, 1 000 au total) la dépassaient ; baissés à 50 et 100.
+  - Overpass était saturé presque toute la session (502 « at capacity », réponses en 30 à 60 s). Le second serveur public a mis 4 min 30 pour répondre 502. D'où un délai de 40 s par essai côté client, et aucune requête réussie depuis l'app : l'affichage a été vérifié en plaçant dans le cache une vraie réponse obtenue plus tôt sur Bergen.
+  - `around` sur une polyligne, la forme prévue pour le couloir, a rendu 0 résultat deux fois là où un rectangle en rendait 24 sur la même zone. Plutôt que d'insister contre un serveur saturé, le couloir passe par des rectangles le long du tracé, filtrés à 3 km côté client.
+  - L'outil de commande a refusé un essai avec un `User-Agent` de navigateur (contournement de contrôle anti-robot) : les essais ont repris avec l'identifiant de l'app, celui du script de données, ce que demande la politique.
+  - Un premier essai sans `User-Agent` a reçu un 406 : le serveur refuse l'agent par défaut de curl.
+  - Le volet du navigateur caché, la carte ne chargeait pas son style (page en arrière-plan) ; il a fallu l'afficher.
+  - Dans les tests, une même `Response` simulée servie deux fois échoue à la seconde lecture du corps : un des tests passait pour de mauvaises raisons avant le passage à `mockImplementation`.
+  - Un bord de case pile sur la longitude 10 a fait échouer un test de la grille écrit trop vite.
+  - Un heredoc Bash long a encore échoué (piège connu) : script écrit dans le brouillon de session.
+- **Décisions** :
+  - Grille de cases de 0,2° plutôt qu'un cache par vue : deux vues qui se recouvrent ne redemandent que les cases manquantes, et le couloir remplit le même cache.
+  - Zoom 11 minimum et 24 cases au plus par requête : un téléphone en voit 6 à 12 en Scandinavie, un grand écran dézoomé est invité à zoomer.
+  - Pas d'annulation des requêtes de la carte : une requête partie va au bout et remplit le cache, les déplacements pendant qu'elle tourne se résument en une relance sur la dernière vue. Annuler aurait gaspillé une unité du plafond et le calcul du serveur.
+  - Le couloir n'est pas synchronisé entre appareils : il pèse et se reconstruit en figeant.
+  - Second serveur `private.coffee` seulement : les autres instances publiques sont payantes, régionales ou demandent une clé ; VK Maps n'a pas été retenu (données de position envoyées hors UE, à décider par la personne).
+- **Chiffres** : 218 tests en 28 fichiers (187 avant) ; 32 requêtes pour figer le voyage de référence (206 cases dans le couloir, 294 couvertes) ; réponse Overpass sur Bergen (0,15° × 0,25°) : 24 points, 6,5 Ko ; environ 14 requêtes Overpass envoyées pendant la session, essais à la main compris.

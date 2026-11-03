@@ -16,7 +16,9 @@ import { dayColor, MAP_MAX_ZOOM, MAP_MIN_ZOOM, buildMapStyle } from "@/lib/const
 import { setActiveMap } from "@/lib/map-registry";
 import { absoluteAssetUrl } from "@/lib/base-url";
 import { initialMapView, tripPoints } from "@/lib/zone";
+import { POI_CATEGORY_LABELS, poisToGeoJSON, viewportStatusText, type PoiCategory } from "@/lib/poi";
 import { loadDataset } from "@/services/datasets";
+import { loadViewportPois } from "@/services/overpass";
 import type { CatalogPlace, LayersState, PlaceInput, PlaceKind } from "@/lib/types";
 import { legCoordinates } from "@/lib/legs";
 import { useTripStore } from "@/store/trip-store";
@@ -34,6 +36,7 @@ const CLICKABLE = [
   "stays-circle",
   "camps-circle",
   "osm-camps-circle",
+  "osm-pois-circle",
   "freedom-fill",
   "custom-circle",
   "itinerary-points",
@@ -221,6 +224,7 @@ export function TripMap() {
   const [freedomError, setFreedomError] = useState<string | null>(null);
   const [draftPin, setDraftPin] = useState<{ lng: number; lat: number } | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [poiStatus, setPoiStatus] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -264,6 +268,7 @@ export function TripMap() {
           addCatalogLayers(map);
           addDocLayers(map);
           addOsmCampLayers(map);
+          addOsmPoiLayers(map);
           addItineraryLayers(map);
           syncVisibility(map, useTripStore.getState().layers);
           syncItinerary(map);
@@ -437,6 +442,54 @@ export function TripMap() {
   }, [nzSources]);
 
   useEffect(() => {
+    // Points d'intérêt OSM de la zone affichée (lot 5), à chaque fin de déplacement de la carte. Pas
+    // d'annulation : une requête partie va au bout et remplit le cache ; les déplacements pendant qu'elle
+    // tourne se résument en une seule relance sur la dernière vue.
+    const map = mapRef.current;
+    if (!map || !mapReady || !layers.osmPois) {
+      setPoiStatus(null);
+      return;
+    }
+    let disposed = false;
+    let inFlight = false;
+    let again = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const refresh = async () => {
+      if (inFlight) {
+        again = true;
+        return;
+      }
+      inFlight = true;
+      try {
+        do {
+          again = false;
+          const b = map.getBounds();
+          setPoiStatus("Points d'intérêt : chargement…");
+          const result = await loadViewportPois({ west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }, map.getZoom());
+          if (disposed) return;
+          (map.getSource("osm-pois") as GeoJSONSource | undefined)?.setData(poisToGeoJSON(result.pois));
+          setPoiStatus(viewportStatusText({ ...result, message: "message" in result ? result.message : undefined, count: result.pois.length }));
+        } while (again && !disposed);
+      } catch {
+        if (!disposed) setPoiStatus("Points d'intérêt indisponibles.");
+      } finally {
+        inFlight = false;
+      }
+    };
+    const onMoveEnd = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void refresh(), 600);
+    };
+    map.on("moveend", onMoveEnd);
+    void refresh();
+    return () => {
+      disposed = true;
+      map.off("moveend", onMoveEnd);
+      if (timer) clearTimeout(timer);
+    };
+  }, [layers.osmPois, mapReady]);
+
+  useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady) return;
     if (camps) (map.getSource("camps") as GeoJSONSource | undefined)?.setData(camps);
@@ -458,7 +511,12 @@ export function TripMap() {
           Carte : {mapError}
         </div>
       )}
-      <LayerControls campsLoading={!camps && !campsError} osmCampsLoading={!osmCamps && !osmCampsError} nzSources={nzSources} />
+      <LayerControls
+        campsLoading={!camps && !campsError}
+        osmCampsLoading={!osmCamps && !osmCampsError}
+        nzSources={nzSources}
+        poiStatus={poiStatus}
+      />
       <DatasetNotice
         problems={[
           campsError ? { label: "Campings DOC", message: campsError } : null,
@@ -703,6 +761,49 @@ function addOsmCampLayers(map: MapLibreMap) {
   });
 }
 
+/** Points d'intérêt OSM à la demande (lot 5), une couleur par catégorie, nom à partir du zoom 13. */
+function addOsmPoiLayers(map: MapLibreMap) {
+  map.addSource("osm-pois", { type: "geojson", data: emptyFc() });
+  map.addLayer({
+    id: "osm-pois-circle",
+    type: "circle",
+    source: "osm-pois",
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 5, 15, 7.5],
+      "circle-color": [
+        "match",
+        ["get", "poiCategory"],
+        "camping",
+        "#15803d",
+        "aire",
+        "#b45309",
+        "vidange",
+        "#475569",
+        "eau",
+        "#0284c7",
+        "#64748b",
+      ],
+      "circle-stroke-color": "#fff",
+      "circle-stroke-width": 1.4,
+    },
+  });
+  map.addLayer({
+    id: "osm-pois-label",
+    type: "symbol",
+    source: "osm-pois",
+    minzoom: 13,
+    layout: {
+      "text-field": ["get", "name"],
+      "text-size": 11,
+      "text-offset": [0, 1.05],
+      "text-anchor": "top",
+      "text-font": ["Noto Sans Regular"],
+      "text-optional": true,
+    },
+    paint: { "text-color": "#334155", "text-halo-color": "#fff", "text-halo-width": 1.2 },
+  });
+}
+
 function addItineraryLayers(map: MapLibreMap) {
   map.addSource("itinerary-lines", { type: "geojson", data: emptyFc() });
   map.addSource("itinerary-points", { type: "geojson", data: emptyFc() });
@@ -802,12 +903,15 @@ function syncVisibility(map: MapLibreMap, layers: LayersState) {
   set("osm-camps-circle", layers.osmCamps);
   set("osm-camps-cluster", layers.osmCamps);
   set("osm-camps-cluster-count", layers.osmCamps);
+  set("osm-pois-circle", layers.osmPois);
+  set("osm-pois-label", layers.osmPois);
   set("freedom-fill", layers.freedom);
   set("freedom-line", layers.freedom);
   set("custom-circle", layers.custom);
 }
 
 function inferKind(layer: string, props: GeoJSON.GeoJsonProperties): PlaceKind {
+  if (layer.startsWith("osm-pois")) return props?.poiCategory === "camping" || props?.poiCategory === "aire" ? "camp" : "poi";
   if (layer.startsWith("towns")) return "town";
   if (layer.startsWith("pois")) return "poi";
   if (layer.startsWith("stays") || layer.startsWith("osm-camps") || layer.startsWith("camps")) return "camp";
@@ -816,7 +920,14 @@ function inferKind(layer: string, props: GeoJSON.GeoJsonProperties): PlaceKind {
   return (props?.kind as PlaceKind) ?? "custom";
 }
 
+function poiLabel(props: GeoJSON.GeoJsonProperties | undefined): string | null {
+  const category = props?.poiCategory as PoiCategory | undefined;
+  return category && category in POI_CATEGORY_LABELS ? POI_CATEGORY_LABELS[category] : null;
+}
+
 function kindLabel(kind: PlaceKind, props?: GeoJSON.GeoJsonProperties): string {
+  const poi = poiLabel(props);
+  if (poi) return poi;
   if (kind === "camp" && props?.source === "OSM") {
     if (props.amenity === "sanitary_dump_station") return "Dump station";
     if (props.tourism === "caravan_site") return "Holiday park";
@@ -841,6 +952,8 @@ function kindLabel(kind: PlaceKind, props?: GeoJSON.GeoJsonProperties): string {
 
 /** Lignes de détail d'une popup, en texte brut : le composant React les échappe. */
 function extraLines(kind: PlaceKind, props: GeoJSON.GeoJsonProperties): string[] {
+  const poi = poiLabel(props);
+  if (poi) return ["Source : OpenStreetMap", props?.opening_hours ? `Horaires : ${String(props.opening_hours)}` : ""].filter(Boolean);
   if (kind === "camp" && props?.source === "OSM") {
     const type =
       props.amenity === "sanitary_dump_station"

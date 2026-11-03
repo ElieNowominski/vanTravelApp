@@ -148,6 +148,7 @@ const initialLayers: LayersState = {
   pois: true,
   camps: true,
   osmCamps: true,
+  osmPois: true,
   freedom: false,
   custom: true,
 };

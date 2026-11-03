@@ -22,7 +22,7 @@ Prompt de reprise :
 - [x] Lot 2 : schéma Supabase (rôles, plafonds)
 - [x] Lot 3 : géographie libre (3 nov. 2026 : recherche Photon, appui long, plus de région par défaut ; 173 tests, parcours vérifié dans le navigateur)
 - [x] Lot 4 : routage par tronçon (3 nov. 2026 : mode par tronçon, saisie manuelle des trains et ferries ; 187 tests, parcours vérifié dans le navigateur)
-- [ ] Lot 5 : points d'intérêt OSM à la demande
+- [x] Lot 5 : points d'intérêt OSM à la demande (3 nov. 2026 : calque de la carte, couloir au figeage, « Sur la route » dans Voyager ; 218 tests ; affichage vérifié dans le navigateur sur données réelles en cache, Overpass saturé pendant la session)
 - [ ] Lot 6 : accueil et création (maquettes puis code)
 - [ ] Lot 7 : dépenses multi-devises et à plusieurs
 - [ ] Lot 8 : validation et préparation de la fusion
@@ -90,9 +90,15 @@ Options :
 
 ## Lot 5 : points d'intérêt OSM à la demande
 
-- [ ] Requête Overpass sur la zone affichée, à partir d'un zoom suffisant : campings, aires de service, vidange, points d'eau. Politique d'usage d'Overpass à vérifier.
-- [ ] Au figeage de l'itinéraire : requête le long du tracé (quelques kilomètres de part et d'autre), mise en cache dans IndexedDB pour le hors ligne.
-- [ ] Compteur par compte et blocage au plafond (lot 2).
+- [x] Politique d'usage d'Overpass vérifiée le 3 nov. 2026 (wiki OSM, page éditée le 2 nov.) : pour une app ou un usage régulier, moins de 100 requêtes et 10 Mo par jour, **tous utilisateurs confondus** ; pause de 30 s après un 429 ou un 406 ; identifier l'app par `User-Agent` ou `Referer` (le navigateur envoie `Origin` et `Referer`, il ne laisse pas fixer le `User-Agent`) ; cache et une requête à la fois. Réponse avec `Access-Control-Allow-Origin: *` ; le serveur se dit « destiné aux outils utilisés depuis un navigateur ». Il était saturé une bonne partie de la session (502 « at capacity »).
+- [x] Logique pure dans `src/lib/poi.ts` : quatre catégories (camping `tourism=camp_site`, aire de camping-car `tourism=caravan_site`, vidange `amenity=sanitary_dump_station`, point d'eau `amenity=water_point` ou `drinking_water`), requête sur un rectangle, lecture de la réponse (étiquettes utiles seulement, identifiant `osm:<type><id>` comme la recherche de lieux), grille de cases de 0,2° pour le cache, couloir, distances au tracé.
+- [x] Carte : calque « Points d'intérêt OSM », partout (Nouvelle-Zélande comprise), une couleur par catégorie, nom à partir du zoom 13, popup avec équipements et « Ajouter à l'itinéraire ». Chargé à partir du zoom 11, à chaque fin de déplacement (600 ms) : cases fraîches lues dans IndexedDB (`vantravel-poi`, un mois, 400 cases au plus), une seule requête sur le rectangle des cases manquantes, rien au-delà de 24 cases (grand écran dézoomé). L'état s'affiche sous l'interrupteur (zoomer, chargement, saturé, plafond, hors ligne avec le nombre de points en cache).
+- [x] Figeage : mise en cache du couloir en arrière-plan (`src/store/poi-store.ts`), 3 km de part et d'autre des tracés routiers (ni ferry ni train). Les cases le long du tracé sont regroupées en rectangles de 4 cases de côté au plus : 32 requêtes pour le voyage de référence (2 223 km), moins si la carte a déjà vu la zone. Chaque rectangle fait est enregistré aussitôt : une coupure ou le plafond n'oblige pas à tout refaire, le dialogue « Plan » montre l'avancement et propose « Compléter le cache ». Voyager affiche « Sur la route » dans la carte du jour : deux points par catégorie, dans l'ordre de la route, avec « km 34 · à 1,2 km du tracé » et le guidage, hors ligne.
+- [x] Plafond `poi` : une unité par requête envoyée pour un compte connecté (comme la recherche de lieux). Migration `0005_poi_limits.sql` : 50 par compte et 100 au total par jour au lieu de 200 et 1 000, qui dépassaient la politique d'Overpass. **À exécuter par la personne** dans SQL Editor sur `vanTravelApp-v2`.
+- [x] Serveurs : `overpass-api.de`, puis `overpass.private.coffee` en repli sur une saturation (5xx, délai dépassé côté serveur), 40 s au plus par essai.
+- Écarts : le couloir passe par des rectangles et non par `around` sur une polyligne, prévu au cadrage. Deux essais `around` ont rendu 0 résultat là où le rectangle en rendait 24 (Bergen) ; serveur saturé, cause non tranchée. Le rectangle est vérifié, remplit aussi le cache de la carte et se reprend par morceaux ; il coûte plus de requêtes (32 contre 10 par jour pour le voyage de référence). Les points d'intérêt ne sont pas synchronisés : chaque appareil met son couloir en cache en figeant, ou par « Compléter le cache ».
+- Non vérifié : aucune requête Overpass réussie depuis l'app (saturé à chaque essai ; le repli `private.coffee` a mis 4 min 30 pour répondre 502 hors de l'app). Carte, popup et « Sur la route » vérifiés avec la vraie réponse de Bergen placée dans le cache ; le dialogue « Plan » d'un itinéraire figé n'a pas été ouvert (figer aurait retiré les alternatives du voyage de référence local) ; le plafond n'a pas été vu avec un vrai compte. Le calque « Holiday parks / OSM » de la Nouvelle-Zélande double en partie le nouveau calque là-bas.
+- [ ] Noté pour l'ouverture au public : 100 requêtes par jour pour toute l'app ne tiennent pas au-delà de quelques comptes ; passer par un relais qui met en cache (Edge Function) ou une instance Overpass payante ou à soi.
 
 ## Lot 6 : accueil et création
 
@@ -128,4 +134,4 @@ Toute nouvelle idée s'ajoute ici et n'en sort que par une décision explicite d
 
 ## Points à vérifier en cours de route
 
-Non vérifiés au cadrage : politique d'usage de Photon (vérifiée au lot 3) et d'Overpass, poids d'une bibliothèque de fuseaux embarquée, source des taux BCE utilisable depuis le navigateur (CORS), quotas gratuits des Edge Functions Supabase.
+Non vérifiés au cadrage : politique d'usage de Photon (vérifiée au lot 3) et d'Overpass (vérifiée au lot 5), poids d'une bibliothèque de fuseaux embarquée, source des taux BCE utilisable depuis le navigateur (CORS), quotas gratuits des Edge Functions Supabase.

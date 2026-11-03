@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Copy, Download, FolderOpen, Lock, LockOpen, Pencil, Save, Trash2, Upload } from "lucide-react";
 import { ConfirmAction } from "@/components/confirm-action";
+import { PoiCorridorStatus } from "@/components/poi-corridor-status";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,6 +26,7 @@ import {
   suggestTripName,
 } from "@/lib/trip-library";
 import type { SavedTrip } from "@/lib/types";
+import { usePoiStore } from "@/store/poi-store";
 import { currentSnapshot, dayStats, useTripStore } from "@/store/trip-store";
 
 export function TripLibraryButton() {
@@ -104,10 +106,14 @@ function TripLibraryDialog({ onOpenChange }: { onOpenChange: (open: boolean) => 
     await refresh();
   };
 
-  /** Figer : une géométrie par tronçon, puis mise à jour du circuit enregistré s'il y en a un. */
+  /**
+   * Figer : une géométrie par tronçon, puis mise à jour du circuit enregistré s'il y en a un, puis mise en
+   * cache des points d'intérêt le long du tracé (lot 5), en arrière-plan : le dialogue peut se fermer.
+   */
   const freeze = async () => {
     state.freezeItinerary();
     const next = useTripStore.getState();
+    if (next.config) void usePoiStore.getState().fill(next.config.id, next.legs, next.days.length);
     if (next.activeSavedId) {
       const trip = buildSavedTrip(next.activeSavedName ?? name, currentSnapshot(next), next.activeSavedId, next.marks, next.config);
       await putSavedTrip(trip);
@@ -299,6 +305,7 @@ function TripLibraryDialog({ onOpenChange }: { onOpenChange: (open: boolean) => 
                 Figé le {new Date(state.frozenAt).toLocaleDateString("fr-FR")} : une route par tronçon, l’app s’ouvre en
                 mode Voyager.
               </p>
+              <PoiCorridorStatus />
               <Button variant="outline" size="sm" className="w-fit" onClick={() => void unfreeze()}>
                 <LockOpen className="size-3.5" />
                 Rouvrir à la planification

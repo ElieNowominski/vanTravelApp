@@ -33,6 +33,13 @@ _Avoid_: région (réservé aux préréglages de la v1)
 **Figer** :
 Arrêter l'itinéraire pour l'alléger et le rendre consultable hors ligne.
 
+**Point d'intérêt** :
+Un lieu utile en route lu sur OSM : camping, aire de camping-car, vidange, point d'eau. Il peut devenir une étape.
+_Avoid_: POI (dans les textes), spot (réservé au catalogue de la v1)
+
+**Couloir** :
+La bande de quelques kilomètres de part et d'autre des tracés d'un itinéraire figé, dont les points d'intérêt sont gardés pour le hors ligne.
+
 ## Véhicule
 
 **Profil de déplacement** :

@@ -7,7 +7,8 @@ import type { LayerKey } from "@/lib/types";
 
 /**
  * Calques propres à la Nouvelle-Zélande, masqués quand le voyage n'y passe pas : catalogue (villes et spots),
- * DOC, et les campings OSM générés au build sur son cadre (les points d'intérêt OSM ailleurs viendront au lot 5).
+ * DOC, et les campings OSM générés au build sur son cadre. Les points d'intérêt OSM à la demande (lot 5)
+ * valent partout, Nouvelle-Zélande comprise.
  */
 const NZ_ONLY: LayerKey[] = ["towns", "pois", "camps", "osmCamps", "freedom"];
 
@@ -16,6 +17,7 @@ const ITEMS: Array<{ key: LayerKey; label: string; hint: string }> = [
   { key: "pois", label: "Spots", hint: "Catalogue" },
   { key: "camps", label: "Campings DOC", hint: "Gérés" },
   { key: "osmCamps", label: "Holiday parks / OSM", hint: "Gratuit, eau, électricité" },
+  { key: "osmPois", label: "Points d'intérêt OSM", hint: "Campings, aires, vidange, eau" },
   { key: "freedom", label: "Freedom camping", hint: "Zones DOC" },
   { key: "custom", label: "Mes pins", hint: "Perso" },
 ];
@@ -24,10 +26,13 @@ export function LayerControls({
   campsLoading,
   osmCampsLoading,
   nzSources = true,
+  poiStatus,
 }: {
   campsLoading?: boolean;
   osmCampsLoading?: boolean;
   nzSources?: boolean;
+  /** État du calque des points d'intérêt : zoom insuffisant, chargement, plafond, hors ligne. */
+  poiStatus?: string | null;
 }) {
   const layers = useTripStore((s) => s.layers);
   const setLayer = useTripStore((s) => s.setLayer);
@@ -61,6 +66,11 @@ export function LayerControls({
           ))}
           {nzSources && layers.camps && campsLoading && (
             <p className="text-xs text-muted-foreground">Chargement des campings DOC…</p>
+          )}
+          {layers.osmPois && poiStatus && (
+            <p className="text-xs text-muted-foreground" aria-live="polite">
+              {poiStatus}
+            </p>
           )}
           {nzSources && layers.osmCamps && osmCampsLoading && (
             <p className="text-xs text-muted-foreground">Chargement holiday parks / OSM…</p>

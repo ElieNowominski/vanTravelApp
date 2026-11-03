@@ -172,7 +172,7 @@ export type TripDay = {
   expenses: Expense[];
 };
 
-export type LayerKey = "towns" | "pois" | "camps" | "osmCamps" | "freedom" | "custom";
+export type LayerKey = "towns" | "pois" | "camps" | "osmCamps" | "osmPois" | "freedom" | "custom";
 
 export type LayersState = Record<LayerKey, boolean>;
 

@@ -1,4 +1,4 @@
--- Schéma complet pour un projet Supabase neuf (équivaut à 0001 à 0004). Sur un projet existant,
+-- Schéma complet pour un projet Supabase neuf (équivaut à 0001 à 0005). Sur un projet existant,
 -- n'exécuter que les migrations de supabase/migrations/ qui n'y sont pas encore passées.
 -- Référence : docs/SUPABASE.md. Toute modification ici s'accompagne d'une migration numérotée.
 -- Droits explicites (section en fin de fichier) : une nouvelle table ou fonction reçoit ses grant,
@@ -90,7 +90,7 @@ create table if not exists public.usage_limits (
 );
 insert into public.usage_limits (service, daily_per_user, daily_total, note) values
   ('geocode', 500, 2000, 'Recherche de lieux (Photon, lot 3)'),
-  ('poi', 200, 1000, 'Points d''intérêt (Overpass, lot 5)'),
+  ('poi', 50, 100, 'Points d''intérêt (Overpass, lot 5) : 100 requêtes par jour au total selon sa politique d''usage'),
   ('rls-check', 3, null, 'Service fictif de scripts/rls-check.mjs')
 on conflict (service) do nothing;
 
