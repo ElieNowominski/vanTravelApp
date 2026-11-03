@@ -17,7 +17,7 @@ Prompt de reprise :
 
 ## État
 
-- [~] Lot 0 : préversion locale et projet Supabase dédié (2 nov. 2026 : hébergement tranché, port 43218 ; reste la part de la personne)
+- [x] Lot 0 : préversion locale et projet Supabase dédié (3 nov. 2026 : port 43218, `.env.next.local`, projet `vanTravelApp-v2`, `rls-check` 37/37)
 - [ ] Lot 1 : modèle v5 et voyage fictif de référence
 - [ ] Lot 2 : schéma Supabase (rôles, plafonds)
 - [ ] Lot 3 : géographie libre (recherche de lieux, fin de la région unique)
@@ -45,7 +45,7 @@ Options :
 - [x] (3 nov. 2026) À faire par la personne : créer le projet Supabase `vanTravelApp-v2` (offre gratuite, deuxième et dernier projet actif possible), y exécuter `supabase/schema.sql`, puis les migrations `0002` et `0003`, désactiver la confirmation d'e-mail le temps des tests, créer deux comptes de test. Authentication > URL Configuration : Site URL et Redirect URLs `http://127.0.0.1:43218/` (+ `http://<ip-du-pc>:43218/` pour le téléphone).
 - [x] Variables séparées sans échange de fichiers (3 nov. 2026) : sur la branche, `npm run dev` passe `--mode next`, donc Vite lit `.env.next.local` (ignoré par git) par-dessus `.env.local`, qui reste celui de la production pour les correctifs sur `main`. Valeurs vides : l'app tourne sans compte, jamais sur la production. `scripts/rls-check.mjs` ne lit plus que `.env.next.local` et affiche le projet visé.
 - [x] (3 nov. 2026) Remplir `.env.next.local` avec l'URL et la clé publiable de `vanTravelApp-v2`. Contrôle anonyme : `beat()` en 204, huit tables exposées et vides, `create_trip` refusé par la RLS.
-- [ ] `scripts/rls-check.mjs` lancé sur `vanTravelApp-v2`.
+- [x] (3 nov. 2026) `scripts/rls-check.mjs` lancé sur `vanTravelApp-v2` : 37/37, migrations 0002 et 0003 comprises.
 - Pas de `keepalive` pour `vanTravelApp-v2` : le workflow planifié ne tourne que depuis `main`, gelé. Après une semaine sans usage, le projet se met en pause ; le relancer depuis le tableau de bord Supabase avant une session de travail.
 
 ## Lot 1 : modèle v5 et voyage fictif de référence
