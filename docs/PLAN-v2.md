@@ -19,7 +19,7 @@ Prompt de reprise :
 
 - [x] Lot 0 : préversion locale et projet Supabase dédié (3 nov. 2026 : port 43218, `.env.next.local`, projet `vanTravelApp-v2`, `rls-check` 37/37)
 - [x] Lot 1 : modèle v5 et voyage fictif de référence (3 nov. 2026 : 141 tests, parcours vérifié dans le navigateur)
-- [ ] Lot 2 : schéma Supabase (rôles, plafonds)
+- [x] Lot 2 : schéma Supabase (rôles, plafonds)
 - [ ] Lot 3 : géographie libre (recherche de lieux, fin de la région unique)
 - [ ] Lot 4 : routage par tronçon
 - [ ] Lot 5 : points d'intérêt OSM à la demande
@@ -60,10 +60,12 @@ Options :
 
 ## Lot 2 : schéma Supabase
 
-- [ ] Rôles par voyage : propriétaire, éditeur, lecteur (aujourd'hui : propriétaire et membres). Règles par ligne réécrites, `rls-check` étendu (un lecteur ne peut rien écrire).
-- [ ] Table de consommation par compte et par jour, pour les services à quota (géocodage, points d'intérêt). Plafonds en configuration, refus explicite au plafond.
-- [ ] Droits explicites (`grant` sur les tables pour `authenticated`, `revoke` pour `anon`) : `schema.sql` n'en pose aucun et dépend de l'option « Automatically expose new tables » du projet, cochée à la création de `vanTravelApp-v2` (3 nov. 2026) pour reproduire la production. Une fois les droits explicites en place, l'option peut être décochée.
-- [ ] Migrations numérotées à partir de `0004`, `supabase/schema.sql` à jour. Exécutées sur `vanTravelApp-v2` seulement jusqu'à la fusion (ADR 0001).
+- [x] Rôles par voyage : propriétaire, éditeur, lecteur. Policies d'écriture sur `can_write` (propriétaire et éditeurs), de lecture sur `is_member` ; `add_member_by_email` prend un rôle, `set_member_role` le change ; la ligne du propriétaire ne se retire pas, un membre peut quitter le voyage. Client : rôle lu à chaque passe, un lecteur reçoit et n'envoie rien ; écran Compte avec le rôle à l'invitation, « Rendre lecteur » ou « Rendre éditeur », « Quitter ce voyage ».
+- [x] Consommation par compte et par jour (`usage`), plafonds en configuration (`usage_limits` : par compte, global optionnel ; départ à 500 et 2 000 pour la recherche de lieux, 200 et 1 000 pour les points d'intérêt, choisis par l'assistant, à confronter aux règles d'usage aux lots 3 et 5), `consume_quota` qui refuse sans compter. Client prêt (`src/lib/quota.ts`, `src/services/quota.ts`), branché aux lots 3 et 5. Garde-fou, pas barrière : les services sont appelés depuis le navigateur.
+- [x] Droits explicites : tout révoqué pour `anon` et `authenticated` puis accordé au cas par cas, plus de droits par défaut pour les objets créés ensuite (`alter default privileges`). L'option « Automatically expose new tables » n'a plus d'effet et peut être décochée.
+- [x] Migration `0004_roles_quotas_grants.sql`, `supabase/schema.sql` à jour (son en-tête citait encore « 0001 + 0002 »). `rls-check` : 72/72 sur `vanTravelApp-v2` le 3 nov. 2026 (37 avant : lecteur, changement de rôle, droits explicites, plafonds). Parcours dans le navigateur avec les deux comptes de test sur le voyage de référence : invitation comme lecteur, « Rendre éditeur » puis « Rendre lecteur », passe du lecteur sans aucune requête d'envoi (« lecture seule : modifications gardées sur cet appareil »), « Envoyer mon itinéraire » masqué pour un lecteur, 375 px sans débordement.
+- [x] Défaut de la v1 trouvé au parcours : « Voyages du compte » listait un voyage une fois par membre (la lecture de `members` montre les co-membres) ; `listMemberTrips` filtre désormais sur la ligne de la personne. Présent aussi sur `main`.
+- Reste : un lecteur peut encore modifier l'app localement (l'interface ne se verrouille pas, ses modifications restent sur l'appareil) ; à traiter avec l'accueil (lot 6). L'aperçu « ce que la passe ferait » ne tient pas compte du rôle.
 
 ## Lot 3 : géographie libre
 

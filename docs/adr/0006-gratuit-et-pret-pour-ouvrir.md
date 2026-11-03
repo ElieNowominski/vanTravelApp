@@ -5,3 +5,5 @@ La v2 sert à la personne, à sa compagne et à des proches invités ; l'inscrip
 ## Consequences
 
 Le serveur de démonstration OSRM, acceptable pour quelques utilisateurs, devra être remplacé avant l'ouverture (OpenRouteService ou GraphHopper derrière une Edge Function).
+
+Les plafonds d'usage (migration 0004) sont un compteur que le client consulte avant d'appeler un service public gratuit : un garde-fou de courtoisie, pas une barrière, puisque Photon et Overpass sont appelés depuis le navigateur. À quelques utilisateurs, ils protègent surtout d'un bogue qui enverrait des requêtes en boucle ; la protection de fond reste côté client (attente de fin de frappe, une requête par seconde, cache). Une barrière réelle, nécessaire pour une ouverture au public, passerait par un relais (Edge Function) qui compte et appelle le service à la place du navigateur. Gardés dès la v2 à la demande de la personne (3 nov. 2026), alors que l'assistant proposait de les reporter à l'ouverture.

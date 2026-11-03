@@ -48,6 +48,18 @@ Un profil de déplacement standard (van aménagé, camping-car, voiture, moto) q
 Une personne qui prend part au voyage, avec un rôle : propriétaire, éditeur ou lecteur.
 _Avoid_: membre
 
+**Propriétaire** :
+Le compte qui a créé le voyage sur le serveur : il invite, change les rôles, retire et supprime. Son rôle ne change pas.
+
+**Éditeur** :
+Un participant qui lit et modifie tout le voyage (itinéraire, réservations, dépenses, documents).
+
+**Lecteur** :
+Un participant qui reçoit tout le voyage et n'envoie rien ; ses modifications restent sur son appareil.
+
+**Plafond d'usage** :
+Le nombre de demandes par compte et par jour à un service à quota (recherche de lieux, points d'intérêt), au-delà duquel l'app ne l'appelle plus jusqu'au lendemain (UTC).
+
 **Payeur** :
 Le participant qui a réglé une dépense.
 

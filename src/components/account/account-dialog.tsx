@@ -8,11 +8,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useOnline } from "@/hooks/use-online";
 import type { ItineraryForce } from "@/lib/sync-model";
+import { ROLE_LABELS, type GrantableRole } from "@/lib/roles";
 import { formatRelativeSync } from "@/lib/sync-status";
 import { cn } from "@/lib/utils";
 import { sendPasswordReset, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from "@/services/auth";
 import { isSupabaseConfigured } from "@/services/supabase";
-import { addMemberByEmail, createTrip, listMemberTrips, listMembers, removeMember, type Member, type MemberTrip } from "@/services/supabase-sync";
+import { addMemberByEmail, createTrip, listMemberTrips, listMembers, removeMember, setMemberRole, type Member, type MemberTrip } from "@/services/supabase-sync";
 import { previewItinerarySync, syncNow } from "@/services/sync";
 import { isSyncConfigured, useAccountStore, type SyncStatus } from "@/store/account-store";
 import { useTripStore } from "@/store/trip-store";
@@ -48,13 +49,14 @@ function AccountDialogBody({ onClose }: { onClose: () => void }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [passphrase, setPassphrase] = useState(settings.passphrase);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<GrantableRole>("editor");
   const [refresh, setRefresh] = useState(0);
 
   // Les voyages du compte, dès qu'on est connecté et en ligne.
   useEffect(() => {
     if (!user || !online) return;
     let alive = true;
-    listMemberTrips()
+    listMemberTrips(user.id)
       .then((list) => alive && setTrips(list))
       .catch((error: unknown) => alive && setMessage(error instanceof Error ? error.message : "Liste des voyages impossible."));
     return () => {
@@ -132,14 +134,41 @@ function AccountDialogBody({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setMessage(null);
     try {
-      await addMemberByEmail(settings.tripId, inviteEmail);
+      await addMemberByEmail(settings.tripId, inviteEmail, inviteRole);
       setInviteEmail("");
       setRefresh((n) => n + 1);
-      setMessage("Personne ajoutée : elle verra le voyage à sa prochaine connexion.");
+      setMessage(`Personne ajoutée comme ${ROLE_LABELS[inviteRole]} : elle verra le voyage à sa prochaine connexion.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Ajout impossible.");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const changeRole = async (member: Member, role: GrantableRole) => {
+    if (!settings.tripId) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await setMemberRole(settings.tripId, member.userId, role);
+      setRefresh((n) => n + 1);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Changement de rôle impossible.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Un membre qui n'est pas propriétaire quitte le voyage ; ses données locales restent. */
+  const leave = async () => {
+    if (!settings.tripId || !user) return;
+    try {
+      await removeMember(settings.tripId, user.id);
+      setSettings({ tripId: null });
+      setRefresh((n) => n + 1);
+      setMessage("Tu as quitté le voyage. Les données de cet appareil restent.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Impossible de quitter le voyage.");
     }
   };
 
@@ -229,17 +258,19 @@ function AccountDialogBody({ onClose }: { onClose: () => void }) {
                       confirmLabel="Recevoir"
                       onConfirm={() => syncWith("réception demandée", "take-remote")}
                     />
-                    <ConfirmAction
-                      variant="outline"
-                      size="sm"
-                      className="h-11"
-                      disabled={status === "syncing"}
-                      icon={<Upload className="size-4" />}
-                      label="Envoyer mon itinéraire"
-                      question="Remplacer l’itinéraire du compte par celui de cet appareil ? L’autre téléphone le recevra à sa prochaine synchro."
-                      confirmLabel="Envoyer"
-                      onConfirm={() => syncWith("envoi demandé", "push-local")}
-                    />
+                    {activeTrip?.role !== "viewer" && (
+                      <ConfirmAction
+                        variant="outline"
+                        size="sm"
+                        className="h-11"
+                        disabled={status === "syncing"}
+                        icon={<Upload className="size-4" />}
+                        label="Envoyer mon itinéraire"
+                        question="Remplacer l’itinéraire du compte par celui de cet appareil ? L’autre téléphone le recevra à sa prochaine synchro."
+                        confirmLabel="Envoyer"
+                        onConfirm={() => syncWith("envoi demandé", "push-local")}
+                      />
+                    )}
                   </div>
                 </>
               )}
@@ -261,7 +292,7 @@ function AccountDialogBody({ onClose }: { onClose: () => void }) {
                         <div className="min-w-0">
                           <p className="truncate text-sm font-medium">{trip.name}</p>
                           <p className="truncate text-xs text-muted-foreground">
-                            {trip.id} · {trip.role === "owner" ? "propriétaire" : "membre"}
+                            {trip.id} · {ROLE_LABELS[trip.role]}
                           </p>
                         </div>
                         <Button size="sm" variant={active ? "default" : "secondary"} className="h-9" disabled={status === "syncing"} onClick={() => chooseTrip(trip.id)}>
@@ -293,6 +324,9 @@ function AccountDialogBody({ onClose }: { onClose: () => void }) {
                   <Users className="size-3.5" />
                   Membres du voyage
                 </h3>
+                {activeTrip?.role === "viewer" && (
+                  <p className="text-xs text-muted-foreground">Tu es lecteur de ce voyage : tu reçois tout, tes modifications restent sur cet appareil.</p>
+                )}
                 {members === null && <p className="text-xs text-muted-foreground">Chargement…</p>}
                 {members && (
                   <ul className="flex flex-col gap-1 text-sm">
@@ -301,18 +335,29 @@ function AccountDialogBody({ onClose }: { onClose: () => void }) {
                         <span className="truncate">
                           {m.displayName}
                           {m.userId === user.id ? " (toi)" : ""}
-                          <span className="text-xs text-muted-foreground"> · {m.role === "owner" ? "propriétaire" : "membre"}</span>
+                          <span className="text-xs text-muted-foreground"> · {ROLE_LABELS[m.role]}</span>
                         </span>
                         {isOwner && m.role !== "owner" && (
-                          <ConfirmAction
-                            variant="ghost"
-                            size="sm"
-                            className="h-9 text-muted-foreground"
-                            label="Retirer"
-                            question={`Retirer ${m.displayName} du voyage ? Ses données locales restent sur son téléphone.`}
-                            confirmLabel="Retirer"
-                            onConfirm={() => void revoke(m)}
-                          />
+                          <span className="flex shrink-0 items-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-11 text-muted-foreground"
+                              disabled={busy}
+                              onClick={() => void changeRole(m, m.role === "viewer" ? "editor" : "viewer")}
+                            >
+                              {m.role === "viewer" ? "Rendre éditeur" : "Rendre lecteur"}
+                            </Button>
+                            <ConfirmAction
+                              variant="ghost"
+                              size="sm"
+                              className="h-11 text-muted-foreground"
+                              label="Retirer"
+                              question={`Retirer ${m.displayName} du voyage ? Ses données locales restent sur son téléphone.`}
+                              confirmLabel="Retirer"
+                              onConfirm={() => void revoke(m)}
+                            />
+                          </span>
                         )}
                       </li>
                     ))}
@@ -334,13 +379,37 @@ function AccountDialogBody({ onClose }: { onClose: () => void }) {
                         spellCheck={false}
                         placeholder="elle@exemple.fr"
                       />
+                    </div>
+                    <div className="flex gap-2">
+                      <select
+                        value={inviteRole}
+                        onChange={(e) => setInviteRole(e.target.value === "viewer" ? "viewer" : "editor")}
+                        className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-base"
+                        aria-label="Rôle de la personne ajoutée"
+                      >
+                        <option value="editor">Éditeur</option>
+                        <option value="viewer">Lecteur</option>
+                      </select>
                       <Button variant="secondary" className="h-11 shrink-0" disabled={busy || !inviteEmail.trim()} onClick={() => void invite()}>
                         <UserPlus className="size-4" />
                         Ajouter
                       </Button>
                     </div>
-                    <p className="text-xs text-muted-foreground">La personne doit d’abord s’être créé un compte dans l’app avec cet e-mail.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Un éditeur modifie le voyage, un lecteur le consulte seulement. La personne doit d’abord s’être créé un compte dans l’app avec cet e-mail.
+                    </p>
                   </div>
+                )}
+                {activeTrip && !isOwner && (
+                  <ConfirmAction
+                    variant="ghost"
+                    size="sm"
+                    className="h-11 w-fit text-muted-foreground"
+                    label="Quitter ce voyage"
+                    question="Quitter ce voyage ? Tu ne le recevras plus ; les données de cet appareil restent. Le propriétaire pourra te réinviter."
+                    confirmLabel="Quitter"
+                    onConfirm={() => void leave()}
+                  />
                 )}
               </section>
             )}

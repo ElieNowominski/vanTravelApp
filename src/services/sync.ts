@@ -1,5 +1,6 @@
 import { deleteDocumentBlob, getDocumentBlob, putDocumentBlob } from "@/lib/document-store";
 import { migrateSnapshot } from "@/lib/migrations";
+import { canWrite } from "@/lib/roles";
 import { decryptSecret, encryptSecret } from "@/lib/secure";
 import {
   applyItinerary,
@@ -37,6 +38,7 @@ import {
   fetchExpenseRows,
   fetchItinerary,
   fetchItineraryMeta,
+  fetchMyRole,
   fetchTravelRows,
   fetchTrip,
   pushDeletions,
@@ -124,13 +126,16 @@ async function pass(reason: string, options: SyncOptions): Promise<string> {
     changes.push("voyage chargé");
   }
 
-  // 2. Tout le reste, en parallèle.
-  const [remoteItin, travelRows, expenseRows, deletionRows] = await Promise.all([
+  // 2. Tout le reste, en parallèle. Un lecteur (rôle viewer) reçoit tout et n'envoie rien : le serveur
+  // refuserait ses écritures ; ses modifications restent sur l'appareil.
+  const [remoteItin, travelRows, expenseRows, deletionRows, role] = await Promise.all([
     fetchItinerary(tripId),
     fetchTravelRows(tripId),
     fetchExpenseRows(tripId),
     fetchDeletions(tripId),
+    account.user ? fetchMyRole(tripId, account.user.id) : Promise.resolve(null),
   ]);
+  const writable = canWrite(role);
 
   // 3. Itinéraire : document entier, dernière écriture gagne.
   const state = useTripStore.getState();
@@ -148,7 +153,8 @@ async function pass(reason: string, options: SyncOptions): Promise<string> {
     hasRemote,
     hasLocal,
   });
-  const decision = resolveItineraryDecision(auto, options.itinerary ?? "auto", { hasLocal, hasRemote });
+  const resolved = resolveItineraryDecision(auto, options.itinerary ?? "auto", { hasLocal, hasRemote });
+  const decision = !writable && resolved === "push-local" ? "none" : resolved;
   if (decision === "take-remote" && remoteItin && remoteSnapshot) {
     snapshot = applyItinerary(snapshot, remoteSnapshot);
     marks = Array.isArray(remoteItin.doc.marks) ? remoteItin.doc.marks : marks;
@@ -191,20 +197,26 @@ async function pass(reason: string, options: SyncOptions): Promise<string> {
   }
   const sealedTravel = await sealTravel(mergedTravel, remoteTravelDoc, passphrase, now);
   const travelToPush = newerRows(travelDocToRows(tripId, sealedTravel), travelRows);
-  if (travelToPush.length > 0) {
-    await pushTravelRows(travelToPush);
-    changes.push(plural(travelToPush.length, "entrée envoyée", "entrées envoyées"));
-  }
   const expensesToPush = newerRows(expensesToRows(tripId, mergedExpenses), expenseRows);
-  if (expensesToPush.length > 0) {
-    await pushExpenseRows(expensesToPush);
-    changes.push(plural(expensesToPush.length, "dépense envoyée", "dépenses envoyées"));
-  }
   const deletionsToPush = newerDeletions(tombstonesToRows(tripId, tombstones), deletionRows);
-  if (deletionsToPush.length > 0) await pushDeletions(deletionsToPush);
+  if (!writable) {
+    if (resolved === "push-local" || travelToPush.length + expensesToPush.length + deletionsToPush.length > 0) {
+      changes.push("lecture seule : modifications gardées sur cet appareil");
+    }
+  } else {
+    if (travelToPush.length > 0) {
+      await pushTravelRows(travelToPush);
+      changes.push(plural(travelToPush.length, "entrée envoyée", "entrées envoyées"));
+    }
+    if (expensesToPush.length > 0) {
+      await pushExpenseRows(expensesToPush);
+      changes.push(plural(expensesToPush.length, "dépense envoyée", "dépenses envoyées"));
+    }
+    if (deletionsToPush.length > 0) await pushDeletions(deletionsToPush);
+  }
 
   // 7. Documents : contenu manquant d'un côté ou de l'autre. Jamais bloquant.
-  const docs = await syncDocuments(tripId, mergedTravel, tombstones, seen);
+  const docs = await syncDocuments(tripId, mergedTravel, tombstones, seen, writable);
   if (docs.uploaded) changes.push(plural(docs.uploaded, "document envoyé", "documents envoyés"));
   if (docs.downloaded) changes.push(plural(docs.downloaded, "document reçu", "documents reçus"));
   if (docs.failed) changes.push(plural(docs.failed, "document en attente", "documents en attente"));
@@ -300,7 +312,8 @@ async function sealTravel(doc: TravelDoc, remote: TravelDoc, passphrase: string,
   return { ...doc, stops };
 }
 
-async function syncDocuments(tripId: string, travel: TravelDoc, tombstones: Record<string, string>, seen: Record<string, string>) {
+/** `writable` faux (lecteur) : réception seulement, le bucket n'est jamais modifié. */
+async function syncDocuments(tripId: string, travel: TravelDoc, tombstones: Record<string, string>, seen: Record<string, string>, writable: boolean) {
   let uploaded = 0;
   let downloaded = 0;
   let failed = 0;
@@ -311,6 +324,7 @@ async function syncDocuments(tripId: string, travel: TravelDoc, tombstones: Reco
     try {
       const local = await getDocumentBlob(doc.id);
       if (local && !seen[key]) {
+        if (!writable) continue;
         if ((await uploadDocument(path, local, doc.mimeType)) === "uploaded") uploaded++;
         seen[key] = path;
       } else if (!local) {
@@ -329,7 +343,7 @@ async function syncDocuments(tripId: string, travel: TravelDoc, tombstones: Reco
   for (const [id, at] of Object.entries(tombstones)) {
     if (!id.startsWith("doc-") || seen[`gone:${id}`]) continue;
     try {
-      await removeDocument(tripId, id);
+      if (writable) await removeDocument(tripId, id);
       await deleteDocumentBlob(id);
       seen[`gone:${id}`] = at;
     } catch {

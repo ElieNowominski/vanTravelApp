@@ -1,3 +1,4 @@
+import { parseRole, roleRank, type GrantableRole, type MemberRole } from "@/lib/roles";
 import { SYNC_FORMAT, type ItineraryDoc } from "@/lib/sync-model";
 import { toIso, type DeletionRow, type ExpenseRow, type TravelItemRow } from "@/lib/sync-rows";
 import { validateTripConfig } from "@/lib/trip-config";
@@ -18,16 +19,19 @@ function signal(): AbortSignal {
   return AbortSignal.timeout(TIMEOUT_MS);
 }
 
-export type MemberTrip = { id: string; name: string; ownerId: string; role: "owner" | "editor"; config: unknown };
+export type MemberTrip = { id: string; name: string; ownerId: string; role: MemberRole; config: unknown };
 
-/** Les voyages dont la personne est membre, avec son rôle. */
-export async function listMemberTrips(): Promise<MemberTrip[]> {
+/**
+ * Les voyages dont la personne est membre, avec son rôle. Filtré sur sa propre ligne : la règle de lecture
+ * de `members` montre aussi les co-membres, ce qui donnait une ligne par membre du voyage.
+ */
+export async function listMemberTrips(userId: string): Promise<MemberTrip[]> {
   const client = requireSupabase();
-  const { data, error } = await client.from("members").select("role, trips(id, name, owner_id, config)").abortSignal(signal());
+  const { data, error } = await client.from("members").select("role, trips(id, name, owner_id, config)").eq("user_id", userId).abortSignal(signal());
   if (error) throw toSyncError(error, "Liste des voyages");
   type Row = { role: string; trips: { id: string; name: string; owner_id: string; config: unknown } | null };
   return ((data ?? []) as unknown as Row[])
-    .flatMap((row) => (row.trips ? [{ id: row.trips.id, name: row.trips.name, ownerId: row.trips.owner_id, role: row.role === "owner" ? ("owner" as const) : ("editor" as const), config: row.trips.config }] : []))
+    .flatMap((row) => (row.trips ? [{ id: row.trips.id, name: row.trips.name, ownerId: row.trips.owner_id, role: parseRole(row.role), config: row.trips.config }] : []))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -48,13 +52,29 @@ export async function createTrip(config: TripConfig): Promise<string> {
   return typeof data === "string" ? data : config.id;
 }
 
-export async function addMemberByEmail(tripId: string, email: string): Promise<void> {
+/** Une personne déjà membre prend le rôle demandé (le propriétaire garde le sien). */
+export async function addMemberByEmail(tripId: string, email: string, role: GrantableRole = "editor"): Promise<void> {
   const client = requireSupabase();
-  const { error } = await client.rpc("add_member_by_email", { p_trip: tripId, p_email: email.trim() }).abortSignal(signal());
+  const { error } = await client.rpc("add_member_by_email", { p_trip: tripId, p_email: email.trim(), p_role: role }).abortSignal(signal());
   if (error) throw toSyncError(error, "Ajout d’un membre");
 }
 
-export type Member = { userId: string; role: "owner" | "editor"; displayName: string };
+/** Le propriétaire seulement, jamais pour lui-même (fonction SQL `set_member_role`). */
+export async function setMemberRole(tripId: string, userId: string, role: GrantableRole): Promise<void> {
+  const client = requireSupabase();
+  const { error } = await client.rpc("set_member_role", { p_trip: tripId, p_user: userId, p_role: role }).abortSignal(signal());
+  if (error) throw toSyncError(error, "Changement de rôle");
+}
+
+/** Rôle de la personne dans le voyage ; `null` si elle n'en est pas (ou plus) membre. */
+export async function fetchMyRole(tripId: string, userId: string): Promise<MemberRole | null> {
+  const client = requireSupabase();
+  const { data, error } = await client.from("members").select("role").eq("trip_id", tripId).eq("user_id", userId).abortSignal(signal()).maybeSingle();
+  if (error) throw toSyncError(error, "Rôle");
+  return data ? parseRole((data as { role: unknown }).role) : null;
+}
+
+export type Member = { userId: string; role: MemberRole; displayName: string };
 
 export async function listMembers(tripId: string): Promise<Member[]> {
   const client = requireSupabase();
@@ -73,8 +93,8 @@ export async function listMembers(tripId: string): Promise<Member[]> {
   if (profilesError) throw toSyncError(profilesError, "Profils");
   const names = new Map(((profiles ?? []) as unknown as Array<{ id: string; display_name: string }>).map((p) => [p.id, p.display_name]));
   return rows
-    .map((r) => ({ userId: r.user_id, role: r.role === "owner" ? ("owner" as const) : ("editor" as const), displayName: names.get(r.user_id) || "(sans nom)" }))
-    .sort((a, b) => (a.role === b.role ? a.displayName.localeCompare(b.displayName) : a.role === "owner" ? -1 : 1));
+    .map((r) => ({ userId: r.user_id, role: parseRole(r.role), displayName: names.get(r.user_id) || "(sans nom)" }))
+    .sort((a, b) => roleRank(a.role) - roleRank(b.role) || a.displayName.localeCompare(b.displayName));
 }
 
 export async function removeMember(tripId: string, userId: string): Promise<void> {

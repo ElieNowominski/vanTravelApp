@@ -21,7 +21,7 @@ export function useTripBoot(): boolean {
       if (!account.user) return;
       if (!account.settings.tripId && (typeof navigator === "undefined" || navigator.onLine)) {
         try {
-          const trips = await listMemberTrips();
+          const trips = await listMemberTrips(account.user.id);
           if (trips[0] && !cancelled) account.setSettings({ tripId: trips[0].id });
         } catch {
           /* hors ligne ou session expirée : l'écran de démarrage le dira */
