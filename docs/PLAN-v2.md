@@ -42,11 +42,11 @@ Options :
 Étapes :
 
 - [x] Port de dev 43218 sur la branche (`package.json`, `vite.config.ts`, `README.md`, `CLAUDE.md`, règle `liberer-port-dev.mdc`).
-- [ ] À faire par la personne : créer le projet Supabase `vantravel-next` (offre gratuite, deuxième et dernier projet actif possible), y exécuter `supabase/schema.sql`, puis les migrations `0002` et `0003`, désactiver la confirmation d'e-mail le temps des tests, créer deux comptes de test. Authentication > URL Configuration : Site URL et Redirect URLs `http://127.0.0.1:43218/` (+ `http://<ip-du-pc>:43218/` pour le téléphone).
+- [x] (3 nov. 2026) À faire par la personne : créer le projet Supabase `vanTravelApp-v2` (offre gratuite, deuxième et dernier projet actif possible), y exécuter `supabase/schema.sql`, puis les migrations `0002` et `0003`, désactiver la confirmation d'e-mail le temps des tests, créer deux comptes de test. Authentication > URL Configuration : Site URL et Redirect URLs `http://127.0.0.1:43218/` (+ `http://<ip-du-pc>:43218/` pour le téléphone).
 - [x] Variables séparées sans échange de fichiers (3 nov. 2026) : sur la branche, `npm run dev` passe `--mode next`, donc Vite lit `.env.next.local` (ignoré par git) par-dessus `.env.local`, qui reste celui de la production pour les correctifs sur `main`. Valeurs vides : l'app tourne sans compte, jamais sur la production. `scripts/rls-check.mjs` ne lit plus que `.env.next.local` et affiche le projet visé.
-- [ ] À faire par la personne : remplir `.env.next.local` avec l'URL et la clé publiable de `vantravel-next`.
-- [ ] `scripts/rls-check.mjs` lancé sur `vantravel-next`.
-- Pas de `keepalive` pour `vantravel-next` : le workflow planifié ne tourne que depuis `main`, gelé. Après une semaine sans usage, le projet se met en pause ; le relancer depuis le tableau de bord Supabase avant une session de travail.
+- [x] (3 nov. 2026) Remplir `.env.next.local` avec l'URL et la clé publiable de `vanTravelApp-v2`. Contrôle anonyme : `beat()` en 204, huit tables exposées et vides, `create_trip` refusé par la RLS.
+- [ ] `scripts/rls-check.mjs` lancé sur `vanTravelApp-v2`.
+- Pas de `keepalive` pour `vanTravelApp-v2` : le workflow planifié ne tourne que depuis `main`, gelé. Après une semaine sans usage, le projet se met en pause ; le relancer depuis le tableau de bord Supabase avant une session de travail.
 
 ## Lot 1 : modèle v5 et voyage fictif de référence
 
@@ -61,8 +61,8 @@ Options :
 
 - [ ] Rôles par voyage : propriétaire, éditeur, lecteur (aujourd'hui : propriétaire et membres). Règles par ligne réécrites, `rls-check` étendu (un lecteur ne peut rien écrire).
 - [ ] Table de consommation par compte et par jour, pour les services à quota (géocodage, points d'intérêt). Plafonds en configuration, refus explicite au plafond.
-- [ ] Droits explicites (`grant` sur les tables pour `authenticated`, `revoke` pour `anon`) : `schema.sql` n'en pose aucun et dépend de l'option « Automatically expose new tables » du projet, cochée à la création de `vantravel-next` (3 nov. 2026) pour reproduire la production. Une fois les droits explicites en place, l'option peut être décochée.
-- [ ] Migrations numérotées à partir de `0004`, `supabase/schema.sql` à jour. Exécutées sur `vantravel-next` seulement jusqu'à la fusion (ADR 0001).
+- [ ] Droits explicites (`grant` sur les tables pour `authenticated`, `revoke` pour `anon`) : `schema.sql` n'en pose aucun et dépend de l'option « Automatically expose new tables » du projet, cochée à la création de `vanTravelApp-v2` (3 nov. 2026) pour reproduire la production. Une fois les droits explicites en place, l'option peut être décochée.
+- [ ] Migrations numérotées à partir de `0004`, `supabase/schema.sql` à jour. Exécutées sur `vanTravelApp-v2` seulement jusqu'à la fusion (ADR 0001).
 
 ## Lot 3 : géographie libre
 
@@ -99,7 +99,7 @@ Options :
 - [ ] Parcours complet du voyage fictif en local (127.0.0.1:43218) : création, planification, figeage, Voyager sans réseau, dépenses à trois.
 - [ ] Port de dev : revenir à 43217 ou garder 43218 après la fusion (les Redirect URLs de la production citent 43217).
 - [ ] Après la fusion et le déploiement : test hors ligne sur l'iPhone, impossible avant (pas de préversion en ligne).
-- [ ] Copie des données NZ migrée dans `vantravel-next`, comparée à l'original.
+- [ ] Copie des données NZ migrée dans `vanTravelApp-v2`, comparée à l'original.
 - [ ] Liste des opérations de fusion : migrations SQL sur la production, fusion dans `main`, vérification sur les deux téléphones, `CLAUDE.md` et `docs/PLAN.md` réconciliés.
 
 ## Hors de la v2

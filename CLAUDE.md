@@ -17,7 +17,7 @@ Backend : un projet **Supabase** (Auth Google ou e-mail, Postgres avec règles p
 7. **Logique métier dans `src/lib`, pure et testée avec Vitest** ; les composants n'hébergent pas de calcul. Les services réseau vivent dans `src/services`.
 8. **Sources externes** : respecter les politiques d'usage (attribution OSM et OSRM, pas de préchargement de tuiles OSM, une requête par seconde vers OSRM).
 9. **Port de dev 43217** : le libérer après tout test (voir `.cursor/rules/liberer-port-dev.mdc`). v2 : port 43218, pour que la branche ait sa propre origine locale et ne migre pas les données de la v1 restées sur 127.0.0.1:43217.
-10. **Git : commits directement sur `main`**, hotfix compris. Une seule personne travaille ici et chaque push déploie sur Pages. Pas de branche ni de PR sauf demande explicite (la phase 7 a vécu sur la branche `supabase` du 8 oct. 2026 jusqu'à sa fusion le jour même). Avant chaque commit : lint, typecheck, tests, et le contrôle « aucune donnée perso » de `.cursor/rules/donnees-perso-et-securite.mdc`. v2 : tout se commite sur la branche `v2`, jamais sur `main`, gelé jusqu'au retour du voyage NZ (correctifs de la v1 seulement, puis fusion de `main` dans `v2`) ; la branche utilise le projet Supabase `vantravel-next`, aucune migration ne touche la production avant la fusion (ADR 0001).
+10. **Git : commits directement sur `main`**, hotfix compris. Une seule personne travaille ici et chaque push déploie sur Pages. Pas de branche ni de PR sauf demande explicite (la phase 7 a vécu sur la branche `supabase` du 8 oct. 2026 jusqu'à sa fusion le jour même). Avant chaque commit : lint, typecheck, tests, et le contrôle « aucune donnée perso » de `.cursor/rules/donnees-perso-et-securite.mdc`. v2 : tout se commite sur la branche `v2`, jamais sur `main`, gelé jusqu'au retour du voyage NZ (correctifs de la v1 seulement, puis fusion de `main` dans `v2`) ; la branche utilise le projet Supabase `vanTravelApp-v2`, aucune migration ne touche la production avant la fusion (ADR 0001).
 11. **Journal en fin de session** : ajouter une entrée dans `docs/JOURNAL.md` selon son gabarit (intention, demandes en substance, livré, cassé ou appris dont les erreurs de l'assistant, décisions avec leur raison, chiffres). Elle sert au retour d'expérience sur la construction de l'app : écrire ce que git ne dit pas, sans donnée personnelle. Pour une étape majeure (nouvelle version, changement d'architecture), ajouter le champ « Avant, après » et garder la trace des questions ouvertes au lancement, comme `docs/CADRAGE-v2.md` : c'est la matière d'une présentation de retour d'expérience.
 
 ## Synchro (phase 7, Supabase)
@@ -27,7 +27,7 @@ Modèle pur dans `src/lib/sync-model.ts` (fusion, extraction, réinjection, déc
 ## Commandes
 
 ```bash
-npm run dev         # http://127.0.0.1:43218 (v2 : mode next, variables Supabase de vantravel-next lues dans .env.next.local par-dessus .env.local)
+npm run dev         # http://127.0.0.1:43218 (v2 : mode next, variables Supabase de vanTravelApp-v2 lues dans .env.next.local par-dessus .env.local)
 npm run data        # jeux de données publics -> public/data/generated/
 npm run lint && npm run typecheck && npm test
 npm run build       # dist/ (BASE_PATH=/vanTravelApp/ sur Pages)

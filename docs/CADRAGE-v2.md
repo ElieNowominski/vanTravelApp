@@ -63,7 +63,7 @@ En préparant le lot 0, l'assistant a trouvé que la préversion sur `/vanTravel
 - le service worker de la v1 a pour portée `/vanTravelApp/` et renvoie `index.html` de la v1 pour toute navigation dans cette portée, `/next/` compris ;
 - GitHub Pages ne publie qu'un site par dépôt : construire les deux versions oblige à modifier `deploy.yml` sur `main`, gelé (Q4).
 
-Options présentées : une préversion sur une autre origine (déploiement de branche chez Netlify, Vercel ou Cloudflare Pages, recommandé), le développement local seul, ou le sous-chemin cloisonné (qui touche `main`). Réponse : **local seulement**. Conséquences : port de dev 43218 sur la branche pour une origine distincte de la v1 locale, pas de test hors ligne sur l'iPhone avant la fusion, projet `vantravel-next` relancé à la main après une pause (ADR 0001).
+Options présentées : une préversion sur une autre origine (déploiement de branche chez Netlify, Vercel ou Cloudflare Pages, recommandé), le développement local seul, ou le sous-chemin cloisonné (qui touche `main`). Réponse : **local seulement**. Conséquences : port de dev 43218 sur la branche pour une origine distincte de la v1 locale, pas de test hors ligne sur l'iPhone avant la fusion, projet `vanTravelApp-v2` relancé à la main après une pause (ADR 0001).
 
 ## Avant, après (cible)
 

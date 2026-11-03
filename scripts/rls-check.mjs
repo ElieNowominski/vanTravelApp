@@ -4,7 +4,7 @@
  * créés pour l'occasion (jamais les vrais comptes). À relancer après tout changement de schéma.
  *
  * Variables d'environnement :
- *   SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY   (par défaut lues dans .env.next.local, projet vantravel-next de la branche v2)
+ *   SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY   (par défaut lues dans .env.next.local, projet vanTravelApp-v2 de la branche v2)
  *   RLS_A_EMAIL, RLS_A_PASSWORD              compte A (propriétaire du voyage de test)
  *   RLS_B_EMAIL, RLS_B_PASSWORD              compte B (tiers, puis membre)
  *
