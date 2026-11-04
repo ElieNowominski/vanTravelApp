@@ -1,9 +1,12 @@
 import { useEffect, useMemo } from "react";
 import { ChevronRight } from "lucide-react";
-import { POI_CATEGORY_LABELS, dayTrackLine, poisAlongLine, routeCaption, simplifyLine, type PoiCategory } from "@/lib/poi";
+import { POI_CATEGORY_LABELS, dayTrackLine, poisAlongLine, routeCaption, simplifyLine, type Poi, type PoiCategory } from "@/lib/poi";
 import { directionsLinks } from "@/lib/voyager";
 import { usePoiStore } from "@/store/poi-store";
 import { useTripStore } from "@/store/trip-store";
+
+/** Même tableau à chaque lecture : un `[]` neuf dans le sélecteur relance le rendu sans fin (cache d'un autre voyage). */
+const NO_POIS: Poi[] = [];
 
 const DOT: Record<PoiCategory, string> = {
   camping: "bg-green-700",
@@ -20,7 +23,7 @@ export function RoutePois({ dayIndex }: { dayIndex: number }) {
   const tripId = useTripStore((s) => s.config?.id ?? null);
   const legs = useTripStore((s) => s.legs);
   const dayCount = useTripStore((s) => s.days.length);
-  const pois = usePoiStore((s) => (s.tripId === tripId ? s.pois : []));
+  const pois = usePoiStore((s) => (s.tripId === tripId ? s.pois : NO_POIS));
   const load = usePoiStore((s) => s.load);
 
   useEffect(() => {

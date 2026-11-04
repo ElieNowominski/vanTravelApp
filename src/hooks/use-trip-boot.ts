@@ -7,7 +7,7 @@ import { useTripStore } from "@/store/trip-store";
 /**
  * Réhydrate le brouillon (IndexedDB) puis, sans voyage chargé et avec un compte : prend le voyage
  * mémorisé (ou le premier du compte) et le synchronise. Partagé par l'écran principal et le roadbook.
- * Sans compte, l'écran de démarrage prend la main.
+ * Sans compte, l'accueil prend la main.
  */
 export function useTripBoot(): boolean {
   const [ready, setReady] = useState(false);
@@ -15,7 +15,10 @@ export function useTripBoot(): boolean {
   useEffect(() => {
     let cancelled = false;
     const boot = async () => {
-      await Promise.all([Promise.resolve(useTripStore.persist.rehydrate()), ensureAccountHydrated()]);
+      // Une seule réhydratation par session : relire IndexedDB après un changement de voyage (accueil) pourrait
+      // ramener l'ancien brouillon si son écriture n'est pas encore terminée.
+      const hydrated = useTripStore.persist.hasHydrated();
+      await Promise.all([hydrated ? undefined : Promise.resolve(useTripStore.persist.rehydrate()), ensureAccountHydrated()]);
       if (useTripStore.getState().config) return;
       const account = useAccountStore.getState();
       if (!account.user) return;

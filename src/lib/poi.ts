@@ -1,7 +1,7 @@
 import { haversineKm } from "@/lib/geo";
 import { selectedOption } from "@/lib/legs";
 import { hashString } from "@/lib/sync-model";
-import type { Leg } from "@/lib/types";
+import type { Leg, PlaceInput } from "@/lib/types";
 
 /**
  * Points d'intérêt OSM à la demande (lot 5) : campings, aires de camping-car, vidanges, points d'eau,
@@ -35,6 +35,49 @@ export const POI_CATEGORY_LABELS: Record<PoiCategory, string> = {
 };
 
 export const POI_CATEGORIES: PoiCategory[] = ["camping", "aire", "vidange", "eau"];
+
+/** Point d'intérêt -> lieu ajoutable : même identifiant que la recherche Photon, catégorie dans `meta`. */
+export function poiToPlaceInput(poi: Poi): PlaceInput {
+  return {
+    placeId: poi.id,
+    name: poi.name,
+    lng: poi.lng,
+    lat: poi.lat,
+    kind: poi.category === "camping" || poi.category === "aire" ? "camp" : "poi",
+    meta: { source: "osm", category: POI_CATEGORY_LABELS[poi.category] },
+  };
+}
+
+function foldText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+/**
+ * Recherche hors ligne dans les points d'intérêt gardés sur l'appareil (cases de la carte, couloir figé) :
+ * noms qui commencent par la saisie d'abord, puis ceux qui la contiennent, sans accents ni casse. Les points
+ * sans vrai nom (nommés d'après leur catégorie) ne sortent pas : « Point d'eau » ne désigne aucun lieu.
+ */
+export function searchPois(pois: Poi[], query: string, limit = 5): Poi[] {
+  const q = foldText(query);
+  if (q.length < 2) return [];
+  const seen = new Set<string>();
+  const starts: Poi[] = [];
+  const contains: Poi[] = [];
+  for (const poi of pois) {
+    if (seen.has(poi.id) || poi.name === POI_CATEGORY_LABELS[poi.category]) continue;
+    const name = foldText(poi.name);
+    if (name.startsWith(q)) starts.push(poi);
+    else if (name.includes(q)) contains.push(poi);
+    else continue;
+    seen.add(poi.id);
+  }
+  const byName = (a: Poi, b: Poi) => a.name.localeCompare(b.name, "fr");
+  return [...starts.sort(byName), ...contains.sort(byName)].slice(0, limit);
+}
 
 /** Zoom à partir duquel la carte charge les points d'intérêt de la zone affichée. */
 export const POI_MIN_ZOOM = 11;

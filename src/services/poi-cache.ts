@@ -100,6 +100,31 @@ async function pruneCells(): Promise<void> {
   });
 }
 
+/**
+ * Tous les points gardés sur l'appareil (cases de la carte et couloirs figés), pour la recherche hors ligne.
+ * Au plus 400 cases et quelques couloirs : quelques milliers de points, lus en une fois.
+ */
+export async function getAllPois(): Promise<Poi[]> {
+  const out: Poi[] = [];
+  const collect = (storeName: string, pick: (value: unknown) => Poi[]) =>
+    run(storeName, "readonly", (store) => {
+      const req = store.openCursor();
+      req.onsuccess = () => {
+        const cursor = req.result;
+        if (!cursor) return;
+        out.push(...pick(cursor.value));
+        cursor.continue();
+      };
+    });
+  try {
+    await collect(CELLS, (value) => (value as CachedCell).pois ?? []);
+    await collect(CORRIDORS, (value) => (value as CachedCorridor).pois ?? []);
+  } catch {
+    /* pas de cache */
+  }
+  return out;
+}
+
 export async function getCorridor(tripId: string): Promise<CachedCorridor | null> {
   try {
     let value: CachedCorridor | null = null;

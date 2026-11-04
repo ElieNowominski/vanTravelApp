@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Navigate } from "react-router";
 import { List, Map as MapIcon } from "lucide-react";
 import { ItineraryPanel } from "@/components/itinerary-panel";
 import { NetworkBanner } from "@/components/network-banner";
 import { UpdateBanner } from "@/components/update-banner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { TripMap } from "@/components/trip-map";
-import { TripSetupScreen } from "@/components/trip-setup-screen";
 import { VoyagerApp } from "@/components/voyager/voyager-app";
 import { useTripBoot } from "@/hooks/use-trip-boot";
 import { useTripZone } from "@/hooks/use-trip-zone";
 import { cn } from "@/lib/utils";
-import { defaultMode } from "@/lib/voyager";
+import { defaultMode, tripPhase } from "@/lib/voyager";
+import { isFirstOpening, markOpened } from "@/lib/launch";
 import { useTripStore } from "@/store/trip-store";
 
 type MobileView = "map" | "list";
@@ -26,6 +27,9 @@ export function TripApp() {
   const frozenAt = useTripStore((s) => s.frozenAt);
   const uiMode = useTripStore((s) => s.uiMode);
   const { today } = useTripZone();
+  // Lu une fois par montage : à l'ouverture de l'app, l'accueil passe devant, sauf pendant un voyage.
+  const [firstOpening] = useState(isFirstOpening);
+  useEffect(markOpened, []);
 
   if (!ready) {
     return (
@@ -35,9 +39,8 @@ export function TripApp() {
     );
   }
 
-  if (!config) {
-    return <TripSetupScreen />;
-  }
+  if (!config) return <Navigate to="/voyages" replace />;
+  if (firstOpening && tripPhase(config, today) !== "during") return <Navigate to="/voyages" replace />;
 
   // Voyager par défaut pendant le voyage (fuseau de l'étape du jour) ou dès que l'itinéraire est figé.
   const mode = uiMode ?? defaultMode(config, frozenAt, today);
@@ -98,7 +101,7 @@ function PlanApp() {
               view === "list" ? "block" : "hidden md:block",
             )}
           >
-            <ItineraryPanel />
+            <ItineraryPanel onShowMap={showMap} />
           </aside>
           <nav
             aria-label="Vue"

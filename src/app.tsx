@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { CompareApp } from "@/components/compare-app";
+import { HomeScreen } from "@/components/home-screen";
+import { NewTripScreen } from "@/components/new-trip-screen";
 import { RoadbookPage } from "@/components/roadbook/roadbook-page";
 import { TripApp } from "@/components/trip-app";
 import { DocumentsPage } from "@/components/voyager/documents-page";
@@ -24,6 +26,8 @@ export function App() {
     <BrowserRouter basename={basename}>
       <Routes>
         <Route path="/" element={<TripApp />} />
+        <Route path="/voyages" element={<HomeScreen />} />
+        <Route path="/voyages/nouveau" element={<NewTripScreen />} />
         <Route path="/comparer" element={<CompareApp />} />
         <Route path="/roadbook" element={<RoadbookPage />} />
         <Route path="/etape/:stopId" element={<StopPage />} />

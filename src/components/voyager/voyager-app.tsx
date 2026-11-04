@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { CalendarDays, ChevronRight, Moon } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Moon } from "lucide-react";
 import { InstallButton } from "@/components/install-button";
 import { ModeSwitch } from "@/components/mode-switch";
 import { NetworkBanner } from "@/components/network-banner";
@@ -55,7 +55,10 @@ export function VoyagerApp() {
       <NetworkBanner />
       <header className="flex flex-col gap-2 border-b px-4 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
-          <div className="min-w-0">
+          <Link to="/voyages" aria-label="Mes voyages" title="Mes voyages" className="-ml-3 flex size-11 shrink-0 items-center justify-center text-primary">
+            <ChevronLeft className="size-5" />
+          </Link>
+          <div className="min-w-0 flex-1">
             <p className="truncate text-xs tracking-wide text-muted-foreground uppercase">
               {zoneName ? `${zoneName} · ` : ""}{formatDateRange(config.start.date, config.end.date)}
             </p>

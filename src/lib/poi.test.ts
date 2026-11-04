@@ -21,6 +21,8 @@ import {
   planCorridor,
   planViewport,
   poiCategory,
+  poiToPlaceInput,
+  searchPois,
   poiWait,
   poisAlongLine,
   poisToGeoJSON,
@@ -255,5 +257,36 @@ describe("couloir le long du tracé", () => {
       poi("camp", 10.45, 60.01, "camping"),
     ];
     expect(poisAlongLine(pois, line).map((p) => p.poi.id)).toEqual(["eau-1", "eau-2", "eau-3", "camp"]);
+  });
+});
+
+describe("recherche hors ligne dans les points d'intérêt gardés", () => {
+  const poi = (id: string, name: string, category: "camping" | "aire" | "vidange" | "eau" = "camping") => ({ id, name, category, lng: 6.5, lat: 60.07, tags: {} });
+  const pois = [
+    poi("osm:n1", "Odda Camping"),
+    poi("osm:n2", "Hardanger Odda Fjordcamp"),
+    poi("osm:n3", "Point d'eau", "eau"),
+    poi("osm:n1", "Odda Camping"),
+    poi("osm:n4", "Ödda bobil", "aire"),
+  ];
+
+  it("met les noms qui commencent par la saisie d'abord, sans accents ni doublons", () => {
+    expect(searchPois(pois, "odda").map((p) => p.id)).toEqual(["osm:n4", "osm:n1", "osm:n2"]);
+  });
+
+  it("ignore les points nommés d'après leur catégorie et les saisies trop courtes", () => {
+    expect(searchPois(pois, "point")).toEqual([]);
+    expect(searchPois(pois, "o")).toEqual([]);
+  });
+
+  it("donne un lieu ajoutable avec l'identifiant OSM et la catégorie", () => {
+    expect(poiToPlaceInput(pois[4])).toEqual({
+      placeId: "osm:n4",
+      name: "Ödda bobil",
+      lng: 6.5,
+      lat: 60.07,
+      kind: "camp",
+      meta: { source: "osm", category: "Aire de camping-car" },
+    });
   });
 });

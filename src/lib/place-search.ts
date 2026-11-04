@@ -219,7 +219,7 @@ export type PlaceOption = {
   key: string;
   name: string;
   caption: string;
-  source: "catalogue" | "osm";
+  source: "catalogue" | "appareil" | "osm";
   input: PlaceInput;
 };
 

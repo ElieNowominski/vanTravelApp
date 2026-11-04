@@ -44,6 +44,7 @@ function parseMilestone(value: unknown, field: string, regionId?: string): TripM
     label: typeof value.label === "string" ? value.label : undefined,
     notes: typeof value.notes === "string" ? value.notes : undefined,
     ...(name ? { name } : {}),
+    ...(typeof value.area === "string" && value.area.trim() ? { area: value.area } : {}),
     ...(lng != null && lat != null ? { lng, lat } : known ? { lng: known.lng, lat: known.lat } : {}),
   };
 }

@@ -237,3 +237,25 @@ Les entrées antérieures au 7 octobre 2026 sont reconstituées après coup depu
   - L'index de la semaine n'est pas figé : sans savoir combien de temps OpenFreeMap garde les anciennes versions, la carte risquerait des trous.
   - Panneau « Calques » replié d'office sur téléphone : ouvert, il couvrait la carte.
 - **Chiffres** : 230 tests en 30 fichiers (218 avant) ; tuiles du zoom 14 compressées, 170 à 210 Ko en ville, 4 à 25 Ko ailleurs ; à Bergen au zoom 15,5, 122 restos et cafés, 13 hébergements, 8 lieux « à voir » dans une vue ; pour le voyage de référence, 9 717 tuiles au zoom 14 sur un couloir de 3 km.
+
+## 2026-11-04 : v2, lot 6 (accueil, création, recherche de lieux)
+
+- **Intention** : terminer le lot 6 : une liste des voyages à l'ouverture, un écran de création complet, une recherche de lieux digne de ce nom, Voyager d'office pendant un voyage.
+- **Demandes** : « Go Lot 6 » ; puis, après les maquettes, « Oui, code-les ».
+- **Livré** : cinq maquettes sur un canevas de design (accueil, premier lancement, création, recherche, recherche sans réseau), validées sans retouche. Puis le code : `src/lib/trip-list.ts` (liste fusionnée, groupes, « dans 7 mois »), `src/lib/new-trip.ts` (saisie, choix « Déplacement », voyage), `searchPois` et `poiToPlaceInput` dans `src/lib/poi.ts`, `getAllPois` dans le cache, `src/store/trip-switch.ts`, `src/lib/launch.ts` ; écrans `home-screen`, `new-trip-screen`, `place-search-screen` ; routes `/voyages` et `/voyages/nouveau` ; lien « Mes voyages » dans Planifier et Voyager ; `area` sur les repères du voyage. `TripSetupScreen` et `PlaceSearchField` supprimés. 25 tests de plus.
+- **Cassé ou appris** :
+  - Au parcours, Voyager restait blanc sur un voyage neuf : « Maximum update depth exceeded ». Le sélecteur de « Sur la route » (lot 5) rendait un `[]` neuf quand le cache des points d'intérêt appartenait à un autre voyage, ce que React lit comme un changement à chaque rendu. Invisible tant qu'on ne changeait jamais de voyage ; remplacé par un tableau vide constant.
+  - Risque repéré en lisant la synchro avant d'écrire le changement de voyage : si `tripId` change avant le brouillon, le voyage ouvert compte comme une modification locale du nouveau et écrase l'itinéraire du compte. D'où l'ordre imposé dans `trip-switch.ts`.
+  - `useTripBoot` relisait IndexedDB à chaque écran : après un changement de voyage, la relecture aurait pu ramener l'ancien brouillon si l'écriture n'était pas finie. Une seule réhydratation par session.
+  - Premier jet de la redirection d'ouverture : seul l'écran du voyage notait l'ouverture ; une session commencée sur `/voyages` aurait renvoyé à l'accueil au premier voyage ouvert. Accueil et création la notent aussi.
+  - Pendant le parcours, un `import()` du store après des modifications à chaud a chargé une seconde instance du module : l'état lu semblait vide alors que l'app était juste. Relire après rechargement.
+  - Légende « Camping · » vide pour un hébergement du catalogue sans région (antérieur) et interrupteur sans nom accessible : corrigés au parcours.
+  - Un heredoc Bash long a encore échoué (piège connu), et un remplacement multi-lignes par script a raté en silence sur un fichier en LF : repris avec l'outil d'édition.
+- **Décisions** :
+  - Un seul choix « Déplacement » au lieu de « mode » et « véhicule » (Q12 du cadrage) : trois préréglages portent déjà leur mode, deux champs faisaient choisir deux fois. Validé avec les maquettes.
+  - Une seule liste pour le compte et l'appareil, la copie locale la plus récente d'un voyage du compte fusionnée à sa ligne ; les autres copies restent des lignes à part sans lien au compte, pour qu'ouvrir une copie ne l'envoie jamais sur le voyage partagé.
+  - Le voyage quitté va toujours dans la bibliothèque : l'app ne tient qu'un brouillon, c'est le seul moyen de ne rien perdre en changeant de voyage.
+  - L'accueil à la première ouverture de session seulement (`sessionStorage`) : un rechargement pour mise à jour ne fait pas perdre l'écran en cours.
+  - Recherche plein écran aussi dans Planifier (« Ajouter une étape »), pour une seule recherche dans l'app ; sur grand écran, un panneau centré.
+  - Pas d'`autoFocus` sur le champ de recherche (règle iOS) : un toucher de plus pour ouvrir le clavier.
+- **Chiffres** : 255 tests en 32 fichiers (230 avant) ; 5 maquettes ; Photon a répondu en 3 à 6 s pendant le parcours.

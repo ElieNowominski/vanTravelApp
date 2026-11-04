@@ -95,7 +95,7 @@ export function catalogOption(place: CatalogEntry): PlaceOption {
   return {
     key: `catalogue:${place.kind}:${place.id}`,
     name: place.name,
-    caption: place.kind === "camp" && place.area ? `${label} · ${place.area}` : `${label} · ${place.region}`,
+    caption: [label, place.kind === "camp" && place.area ? place.area : place.region].filter(Boolean).join(" · "),
     source: "catalogue",
     input: placeToInput(place),
   };

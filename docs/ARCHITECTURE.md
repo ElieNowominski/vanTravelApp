@@ -89,10 +89,10 @@ Chiffrement optionnel des codes d'accès (`src/lib/secure.ts`) : AES-GCM 256, cl
 
 ## Flux des données au démarrage
 
-1. Réhydratation du brouillon (IndexedDB, `useTripBoot`), puis choix du mode (Planifier ou Voyager).
+1. Réhydratation du brouillon (IndexedDB, `useTripBoot`, une seule fois par session), puis : pendant un voyage, Voyager ; sinon, à la première ouverture de la session, l'accueil `/voyages` (`src/lib/launch.ts`), puis le mode choisi (Planifier ou Voyager).
 2. En parallèle, `startAuthListener` relit la session supabase-js et recopie l'identité dans le store de compte (hors ligne, l'identité mémorisée reste).
 3. Sans voyage chargé mais connecté : le voyage mémorisé, sinon le premier du compte (`listMemberTrips`), puis `syncNow("démarrage")` lit `trips.config`, l'itinéraire et les données de voyage. Si ni le compte ni l'appareil n'ont d'itinéraire, le `plan` du voyage est posé (routes recalculées) et envoyé à la passe suivante.
-4. Toujours sans voyage : écran de démarrage (`TripSetupScreen`) : se connecter, importer une sauvegarde, rouvrir un circuit de la bibliothèque, créer un voyage neuf. Un voyage local se met sur le compte depuis le dialogue (« Mettre « nom » sur le compte », `create_trip`), puis la première passe envoie tout.
+4. Toujours sans voyage : l'accueil (`HomeScreen`), écran de premier lancement s'il n'y a rien : créer un voyage (`/voyages/nouveau`), se connecter, importer une sauvegarde. L'accueil liste les voyages du compte et de la bibliothèque (`buildTripEntries`) ; en ouvrir un passe par `openTripEntry` (`src/store/trip-switch.ts`), qui range d'abord le voyage ouvert dans la bibliothèque, puis pose le voyage et `tripId` dans cet ordre. Un voyage local se met sur le compte depuis le dialogue (« Mettre « nom » sur le compte », `create_trip`), puis la première passe envoie tout.
 5. Un circuit local sous un autre identifiant que le voyage du compte (sauvegarde importée, bibliothèque) est conservé par la synchro s'il couvre les mêmes dates : `decideItinerary` tranche ensuite. Seul un calendrier différent remet le brouillon à zéro.
 
 ## Phases

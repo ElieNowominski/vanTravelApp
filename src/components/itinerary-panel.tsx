@@ -3,6 +3,8 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import {
   ChevronDown,
+  ChevronLeft,
+  Search,
   Columns2,
   Download,
   MapPin,
@@ -19,7 +21,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ConfirmAction } from "@/components/confirm-action";
 import { InstallButton } from "@/components/install-button";
-import { PlaceSearchField } from "@/components/place-search-field";
+import { PlaceSearchScreen } from "@/components/place-search-screen";
 import { ModeSwitch } from "@/components/mode-switch";
 import { SyncStatusButton } from "@/components/account/sync-status-button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -43,7 +45,8 @@ import { patchSavedTripMarks } from "@/lib/trip-library";
 import { cn } from "@/lib/utils";
 import { dayStats, selectedOption, useTripStore } from "@/store/trip-store";
 
-export function ItineraryPanel() {
+/** `onShowMap` : sur téléphone, passe à l'onglet Carte (« Choisir sur la carte » de la recherche). */
+export function ItineraryPanel({ onShowMap }: { onShowMap?: () => void } = {}) {
   const days = useTripStore((s) => s.days);
   const stops = useTripStore((s) => s.stops);
   const legs = useTripStore((s) => s.legs);
@@ -76,6 +79,7 @@ export function ItineraryPanel() {
   const [marksOpen, setMarksOpen] = useState(false);
   const [openStopId, setOpenStopId] = useState<string | null>(null);
   const [openLegId, setOpenLegId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const currency = useMemo(() => defaultExpenseCurrency(allExpenses(days)), [days]);
   const localResults = useCallback((query: string) => searchCatalog(catalog, query).map(catalogOption), [catalog]);
   const bias = useMemo(() => searchBias({ days, stops }, currentDayIndex, config?.start), [days, stops, currentDayIndex, config]);
@@ -96,6 +100,10 @@ export function ItineraryPanel() {
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header className="border-b px-4 py-3">
+        <Link to="/voyages" className="-mt-2 -ml-2 inline-flex h-11 items-center gap-0.5 pr-2 text-sm text-primary">
+          <ChevronLeft className="size-4" />
+          Mes voyages
+        </Link>
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <p className="text-xs tracking-wide text-muted-foreground uppercase">
@@ -229,12 +237,25 @@ export function ItineraryPanel() {
       </header>
 
       <div className="border-b px-4 py-2">
-        <PlaceSearchField
-          placeholder="Ville, camping, gare, point de vue…"
-          local={localResults}
-          bias={bias}
-          onSelect={(place) => void addPlace(place)}
-        />
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="flex h-11 w-full items-center gap-2 rounded-lg border bg-card px-3 text-left text-base text-muted-foreground hover:bg-muted"
+        >
+          <Search className="size-4 shrink-0" />
+          Ajouter une étape : ville, camping, gare…
+        </button>
+        {searchOpen && (
+          <PlaceSearchScreen
+            title="Ajouter une étape"
+            placeholder="Ville, camping, gare, point de vue…"
+            local={localResults}
+            bias={bias}
+            onSelect={(place) => void addPlace(place)}
+            onClose={() => setSearchOpen(false)}
+            onPickOnMap={onShowMap ?? (() => undefined)}
+          />
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain [-webkit-overflow-scrolling:touch]">

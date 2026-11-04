@@ -7,8 +7,9 @@ import { cn } from "@/lib/utils";
 import { syncBadge } from "@/lib/sync-status";
 import { isSyncConfigured, useAccountStore } from "@/store/account-store";
 
-/** Icône d'état de la synchro (nuage, en cours, en attente, erreur) qui ouvre « Compte et synchro ». */
-export function SyncStatusButton({ variant = "icon" }: { variant?: "icon" | "full" }) {
+/** Icône d'état de la synchro (nuage, en cours, en attente, erreur) qui ouvre « Compte et synchro ».
+ * `round` : rond de 44 px, en tête de l'accueil. */
+export function SyncStatusButton({ variant = "icon" }: { variant?: "icon" | "round" | "full" }) {
   const [open, setOpen] = useState(false);
   const status = useAccountStore((s) => s.status);
   const pending = useAccountStore((s) => s.pending);
@@ -19,19 +20,25 @@ export function SyncStatusButton({ variant = "icon" }: { variant?: "icon" | "ful
 
   const icon =
     badge.kind === "syncing" ? (
-      <RefreshCw className={cn(variant === "icon" ? "size-3.5" : "size-4", "animate-spin")} />
+      <RefreshCw className={cn(variant !== "full" ? "size-3.5" : "size-4", "animate-spin")} />
     ) : badge.kind === "error" ? (
-      <TriangleAlert className={cn(variant === "icon" ? "size-3.5" : "size-4", "text-destructive")} />
+      <TriangleAlert className={cn(variant !== "full" ? "size-3.5" : "size-4", "text-destructive")} />
     ) : badge.kind === "offline" || badge.kind === "unconfigured" ? (
-      <CloudOff className={variant === "icon" ? "size-3.5" : "size-4"} />
+      <CloudOff className={variant !== "full" ? "size-3.5" : "size-4"} />
     ) : (
-      <Cloud className={variant === "icon" ? "size-3.5" : "size-4"} />
+      <Cloud className={variant !== "full" ? "size-3.5" : "size-4"} />
     );
 
   return (
     <>
-      {variant === "icon" ? (
-        <Button variant="outline" size="icon-sm" className="relative" onClick={() => setOpen(true)} title={badge.label}>
+      {variant !== "full" ? (
+        <Button
+          variant="outline"
+          size={variant === "round" ? "icon" : "icon-sm"}
+          className={cn("relative", variant === "round" && "size-11 rounded-full text-primary [&_svg]:size-5")}
+          onClick={() => setOpen(true)}
+          title={badge.label}
+        >
           {icon}
           {badge.kind === "pending" && <span aria-hidden className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-amber-500" />}
           <span className="sr-only">{badge.label}</span>

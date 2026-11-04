@@ -127,7 +127,7 @@ function seedStart(config: TripConfig | null): { days: TripDay[]; stops: Record<
   const { start } = config;
   const input =
     typeof start.lng === "number" && typeof start.lat === "number"
-      ? { placeId: start.placeId, name: start.name ?? start.placeId, lng: start.lng, lat: start.lat, kind: "town" as const, ...(place ? { area: place.area } : {}) }
+      ? { placeId: start.placeId, name: start.name ?? start.placeId, lng: start.lng, lat: start.lat, kind: "town" as const, ...(start.area ? { area: start.area } : place?.area ? { area: place.area } : {}) }
       : place
         ? placeToInput(place)
         : null;

@@ -298,6 +298,8 @@ export type TripMilestone = {
   name?: string;
   lng?: number;
   lat?: number;
+  /** Localisation affichée sous le nom (« Capitale, Danemark »). */
+  area?: string;
 };
 
 export type PlanStop = {
