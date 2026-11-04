@@ -105,6 +105,17 @@ Options :
 - [ ] Maquettes sur un canevas : accueil (voyages en cours, à venir, passés, sobre), création, recherche de lieux. Validation par la personne avant le code.
 - [ ] Création : nom, dates, départ, arrivée (égale au départ par défaut), mode par défaut, préréglage de véhicule. Un seul écran à 390 px.
 - [ ] Ouverture directe sur Voyager pendant un voyage ; « aujourd'hui » calculé dans le fuseau de l'étape en cours.
+- [ ] Fond de carte vectoriel OpenFreeMap Liberty, retenu par la personne le 4 nov. 2026 après le prototype de la branche `proto/fond-vectoriel` (commits `6b85126`, `febb47a`, constats dans leurs messages ; branche à ne pas fusionner). À reprendre proprement, avec tests :
+  - noms de villes, villages, hameaux et lieux du fond cliquables partout, popup « Ajouter à l'itinéraire » ; le lieu le plus proche du doigt, pas le premier trouvé ; nom français (`name:fr`) puis nom local, au lieu du `name_en` du style ;
+  - calques superposés lus dans les tuiles, sans requête ni plafond : campings, hébergements, restos et cafés, courses, carburant et recharge, à voir, toilettes et eau ; visibles à partir du zoom 14 seulement (les tuiles n'ont pas ces lieux en dessous), le calque Overpass du lot 5 garde la vue d'ensemble des campings dès le zoom 11 ;
+  - popup sans la ligne technique du prototype (calque, `class`, `subclass`, `rank`) ;
+  - panneau « Calques » repliable ou en pastilles : avec sept interrupteurs de plus, il couvre la carte à 390 px ;
+  - repli sur les tuiles raster OSM si OpenFreeMap ne répond pas (aucune garantie de service) ; règle 8 de `CLAUDE.md` et attribution OpenMapTiles à mettre à jour.
+- [ ] Data mobile en voyage, à trancher avec la personne avant le code. Chiffres du voyage de référence (4 nov. 2026) : couloir de 3 km le long des tracés, 1 021 tuiles au zoom 12, 3 152 au zoom 13, 9 717 au zoom 14 ; 5 km autour des 9 nuits, 621 tuiles au zoom 14. Une tuile dense de Bergen au zoom 14 pèse 268 Ko décompressée ; poids moyen non mesuré. OpenFreeMap accepte un téléchargement hors ligne d'au plus 3 000 tuiles ou 50 Mo, 4 requêtes en parallèle, avec un `User-Agent` propre à l'app, que le navigateur ne laisse pas fixer. Pistes :
+  1. cache passif dans le service worker : toute tuile vue (en préparant le voyage sur le Wi-Fi) resservie sans réseau ; aucun téléchargement en masse, donc dans les règles ;
+  2. préchargement au figeage, dans la limite des 3 000 tuiles (zooms 8 à 12 sur le couloir et 13 à 14 autour des nuits : environ 2 500), après accord écrit d'OpenFreeMap faute de `User-Agent` ;
+  3. extrait PMTiles auto-hébergé de la zone du voyage, aujourd'hui dans « Hors de la v2 » (cartes hors ligne).
+  Non vérifiés : quota de stockage et éviction du Cache API sur iPhone (web app installée ou Safari).
 
 ## Lot 7 : dépenses multi-devises et à plusieurs
 
