@@ -111,11 +111,13 @@ Options :
   - popup sans la ligne technique du prototype (calque, `class`, `subclass`, `rank`) ;
   - panneau « Calques » repliable ou en pastilles : avec sept interrupteurs de plus, il couvre la carte à 390 px ;
   - repli sur les tuiles raster OSM si OpenFreeMap ne répond pas (aucune garantie de service) ; règle 8 de `CLAUDE.md` et attribution OpenMapTiles à mettre à jour.
-- [ ] Data mobile en voyage, à trancher avec la personne avant le code. Chiffres du voyage de référence (4 nov. 2026) : couloir de 3 km le long des tracés, 1 021 tuiles au zoom 12, 3 152 au zoom 13, 9 717 au zoom 14 ; 5 km autour des 9 nuits, 621 tuiles au zoom 14. Une tuile dense de Bergen au zoom 14 pèse 268 Ko décompressée ; poids moyen non mesuré. OpenFreeMap accepte un téléchargement hors ligne d'au plus 3 000 tuiles ou 50 Mo, 4 requêtes en parallèle, avec un `User-Agent` propre à l'app, que le navigateur ne laisse pas fixer. Pistes :
-  1. cache passif dans le service worker : toute tuile vue (en préparant le voyage sur le Wi-Fi) resservie sans réseau ; aucun téléchargement en masse, donc dans les règles ;
-  2. préchargement au figeage, dans la limite des 3 000 tuiles (zooms 8 à 12 sur le couloir et 13 à 14 autour des nuits : environ 2 500), après accord écrit d'OpenFreeMap faute de `User-Agent` ;
-  3. extrait PMTiles auto-hébergé de la zone du voyage, aujourd'hui dans « Hors de la v2 » (cartes hors ligne).
-  Non vérifiés : quota de stockage et éviction du Cache API sur iPhone (web app installée ou Safari).
+- [ ] Data mobile en voyage : **cache passif**, choisi par la personne le 4 nov. 2026. Le service worker garde les tuiles déjà affichées (comme la règle `osm-tiles` de `vite.config.ts` pour le raster) : préparer le voyage sur le Wi-Fi en parcourant les étapes suffit à les avoir sans réseau. Aucun téléchargement en masse. Écartés pour l'instant : préchargement au figeage (au plus 3 000 tuiles chez OpenFreeMap, avec un `User-Agent` que le navigateur ne laisse pas fixer ; il faudrait leur accord écrit) et extrait de carte auto-hébergé (« Hors de la v2 »). Réglages, d'après les en-têtes relevés le 4 nov. 2026 :
+  - tuiles `tiles.openfreemap.org/planet/<version>/…` : `CacheFirst` (servies avec un `max-age` de dix ans, chemin daté donc immuable), nombre d'entrées à fixer selon le poids moyen mesuré ;
+  - index `/planet` (`max-age` d'une heure), style (un jour), sprites et polices : `NetworkFirst` avec un délai court, pour resservir hors ligne la version déjà en cache ;
+  - revers : à chaque nouvelle version hebdomadaire d'OpenFreeMap, une vue en ligne retélécharge ses tuiles. Durée de conservation des anciennes versions inconnue : ne pas figer l'index sans la connaître ;
+  - mesurer avant de fixer les plafonds : poids moyen d'une tuile au zoom 14 en ville et à la campagne, data d'une journée type de navigation.
+  Repères chiffrés (voyage de référence, 4 nov. 2026) : couloir de 3 km, 1 021 tuiles au zoom 12, 3 152 au zoom 13, 9 717 au zoom 14 ; 5 km autour des 9 nuits, 621 tuiles au zoom 14 ; une tuile dense de Bergen au zoom 14, 268 Ko décompressée.
+  Non vérifiés aussi : quota de stockage et éviction du Cache API sur iPhone (web app installée ou Safari).
 
 ## Lot 7 : dépenses multi-devises et à plusieurs
 
