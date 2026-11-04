@@ -151,6 +151,13 @@ const initialLayers: LayersState = {
   osmPois: true,
   freedom: false,
   custom: true,
+  baseCamps: true,
+  baseLodging: true,
+  baseFood: true,
+  baseShops: false,
+  baseFuel: false,
+  baseSights: true,
+  baseServices: false,
 };
 
 function initialTrip(config: TripConfig | null) {

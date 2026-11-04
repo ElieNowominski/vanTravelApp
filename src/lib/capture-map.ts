@@ -1,4 +1,5 @@
 import type { LngLatBounds, Map as MapLibreMap } from "maplibre-gl";
+import { BASE_OVERLAY_LAYER_IDS } from "@/lib/base-map";
 import { legCoordinates } from "@/lib/legs";
 import type { TripState } from "@/store/trip-store";
 
@@ -18,6 +19,7 @@ const CLUTTER_LAYERS = [
   "freedom-fill",
   "freedom-line",
   "custom-circle",
+  ...BASE_OVERLAY_LAYER_IDS,
 ];
 
 export async function captureTripMapImage(

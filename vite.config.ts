@@ -86,6 +86,30 @@ export default defineConfig(({ mode }) => {
               },
             },
             {
+              // Lot 6, cache passif du fond vectoriel OpenFreeMap : seules les tuiles déjà affichées, gardées
+              // pour la data mobile et le hors ligne. Chemin daté par version, servi avec un max-age de dix ans :
+              // une tuile ne change jamais. Mesuré le 4 nov. 2026 : 170 à 210 Ko en ville au zoom 14, 4 à 25 Ko ailleurs.
+              urlPattern: /^https:\/\/tiles\.openfreemap\.org\/planet\/[^/]+\/\d+\/\d+\/\d+\.pbf$/,
+              handler: "CacheFirst",
+              options: {
+                cacheName: "ofm-tiles",
+                expiration: { maxEntries: 2000, maxAgeSeconds: 90 * 24 * 3600, purgeOnQuotaError: true },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
+              // Style, index des tuiles (version de la semaine), polices, icônes : le réseau d'abord, la copie
+              // gardée hors ligne ou s'il tarde, pour que la carte retrouve les tuiles déjà en cache.
+              urlPattern: /^https:\/\/tiles\.openfreemap\.org\//,
+              handler: "NetworkFirst",
+              options: {
+                cacheName: "ofm-style",
+                networkTimeoutSeconds: 4,
+                expiration: { maxEntries: 400, maxAgeSeconds: 90 * 24 * 3600, purgeOnQuotaError: true },
+                cacheableResponse: { statuses: [0, 200] },
+              },
+            },
+            {
               urlPattern: /^https:\/\/router\.project-osrm\.org\//,
               handler: "NetworkOnly",
             },

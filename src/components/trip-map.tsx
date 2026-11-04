@@ -12,11 +12,22 @@ import { buildCatalog, catalogRegionIds, type Catalog } from "@/lib/catalog";
 import { DEFAULT_REGION_ID } from "@/lib/regions";
 import { asPointCollection } from "@/lib/geo";
 import { amenityChips, amenitiesFromProperties, amenitySummary } from "@/lib/amenities";
-import { dayColor, MAP_MAX_ZOOM, MAP_MIN_ZOOM, buildMapStyle } from "@/lib/constants";
+import { dayColor, MAP_MAX_ZOOM, MAP_MIN_ZOOM } from "@/lib/constants";
+import {
+  BASE_OVERLAYS,
+  BASE_POI_MIN_ZOOM,
+  BASE_SOURCE,
+  baseOverlayLabelId,
+  baseOverlayLayerId,
+  describeBaseFeature,
+  isClickableBaseLabel,
+  nearestTo,
+} from "@/lib/base-map";
 import { setActiveMap } from "@/lib/map-registry";
 import { absoluteAssetUrl } from "@/lib/base-url";
 import { initialMapView, tripPoints } from "@/lib/zone";
 import { POI_CATEGORY_LABELS, poisToGeoJSON, viewportStatusText, type PoiCategory } from "@/lib/poi";
+import { loadBaseStyle } from "@/services/base-map";
 import { loadDataset } from "@/services/datasets";
 import { loadViewportPois } from "@/services/overpass";
 import type { CatalogPlace, LayersState, PlaceInput, PlaceKind } from "@/lib/types";
@@ -226,6 +237,8 @@ export function TripMap() {
   const [mapReady, setMapReady] = useState(false);
   const [poiStatus, setPoiStatus] = useState<string | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
+  // Fond vectoriel chargé (calques superposés possibles), ou repli sur les tuiles raster.
+  const [vectorBase, setVectorBase] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -238,11 +251,15 @@ export function TripMap() {
 
       // Worker copié dans public/maplibre/ par scripts/copy-maplibre-worker.mjs.
       maplibregl.setWorkerUrl(absoluteAssetUrl("maplibre/maplibre-gl-worker.mjs"));
+      // Lot 6 : fond vectoriel OpenFreeMap, repli sur les tuiles raster OSM s'il ne vient pas.
+      const base = await loadBaseStyle();
+      if (cancelled || !containerRef.current || mapRef.current) return;
+      setVectorBase(base.vector);
       // v2 : cadrée sur le voyage (zone déduite des étapes, ADR 0003), plus sur une région fixe.
       const state = useTripStore.getState();
       const map = new maplibregl.Map({
         container: containerRef.current,
-        style: buildMapStyle(),
+        style: base.style,
         ...initialMapView(tripPoints(state.config, state)),
         fitBoundsOptions: { padding: 32 },
         minZoom: MAP_MIN_ZOOM,
@@ -265,6 +282,8 @@ export function TripMap() {
       const initLayers = () => {
         if (map.getLayer("towns-circle")) return;
         try {
+          // Sous tous nos calques : les points lus dans les tuiles du fond.
+          addBaseOverlayLayers(map);
           addCatalogLayers(map);
           addDocLayers(map);
           addOsmCampLayers(map);
@@ -325,12 +344,17 @@ export function TripMap() {
         onFeatureClick(map, features[0], event.lngLat, popupRef.current);
         return;
       }
+      if (!useTripStore.getState().pinMode && onBaseClick(map, box, event.point, popupRef.current)) return;
       if (useTripStore.getState().pinMode) {
         setDraftPin({ lng: event.lngLat.lng, lat: event.lngLat.lat });
       }
     });
 
-    for (const layer of CLICKABLE) {
+    const hoverable = [...CLICKABLE, ...BASE_OVERLAYS.map((o) => baseOverlayLayerId(o.key))];
+    map.once("style.load", () => {
+      for (const layer of map.getStyle().layers.filter(isClickableBaseLabel)) hoverable.push(layer.id);
+    });
+    for (const layer of hoverable) {
       map.on("mouseenter", layer, () => {
         map.getCanvas().style.cursor = "pointer";
       });
@@ -516,6 +540,7 @@ export function TripMap() {
         osmCampsLoading={!osmCamps && !osmCampsError}
         nzSources={nzSources}
         poiStatus={poiStatus}
+        baseOverlays={vectorBase}
       />
       <DatasetNotice
         problems={[
@@ -886,6 +911,86 @@ function syncCustom(map: MapLibreMap, pins: PlaceInput[]) {
   });
 }
 
+/** Points superposés lus dans la couche `poi` des tuiles du fond vectoriel (lot 6), noms au zoom 15. */
+function addBaseOverlayLayers(map: MapLibreMap) {
+  if (!map.getSource(BASE_SOURCE)) return;
+  for (const overlay of BASE_OVERLAYS) {
+    map.addLayer({
+      id: baseOverlayLayerId(overlay.key),
+      type: "circle",
+      source: BASE_SOURCE,
+      "source-layer": "poi",
+      minzoom: BASE_POI_MIN_ZOOM,
+      filter: overlay.filter as never,
+      paint: {
+        "circle-radius": ["interpolate", ["linear"], ["zoom"], 14, 5, 17, 8],
+        "circle-color": overlay.color,
+        "circle-stroke-color": "#fff",
+        "circle-stroke-width": 1.5,
+      },
+    });
+    map.addLayer({
+      id: baseOverlayLabelId(overlay.key),
+      type: "symbol",
+      source: BASE_SOURCE,
+      "source-layer": "poi",
+      minzoom: 15,
+      filter: overlay.filter as never,
+      layout: {
+        "text-field": ["coalesce", ["get", "name:fr"], ["get", "name"]],
+        "text-size": 11,
+        "text-offset": [0, 1.1],
+        "text-anchor": "top",
+        "text-font": ["Noto Sans Regular"],
+        "text-optional": true,
+      },
+      paint: { "text-color": overlay.color, "text-halo-color": "#fff", "text-halo-width": 1.3 },
+    });
+  }
+}
+
+/**
+ * Clic sur un point superposé ou un nom du fond (ville, village, lieu) : popup « Ajouter à l'itinéraire ».
+ * Le plus proche du doigt l'emporte ; les points superposés passent avant les noms. Vrai si un lieu est touché.
+ */
+function onBaseClick(map: MapLibreMap, box: [[number, number], [number, number]], at: { x: number; y: number }, popup: Popup | null): boolean {
+  if (!popup || !map.getSource(BASE_SOURCE)) return false;
+  const overlays = presentLayers(map, BASE_OVERLAYS.map((o) => baseOverlayLayerId(o.key))).filter(
+    (id) => map.getLayoutProperty(id, "visibility") !== "none",
+  );
+  const labels = map.getStyle().layers.filter(isClickableBaseLabel).map((l) => l.id);
+  const fromOverlays = overlays.length ? map.queryRenderedFeatures(box, { layers: overlays }) : [];
+  const candidates = fromOverlays.length ? fromOverlays : labels.length ? map.queryRenderedFeatures(box, { layers: labels }) : [];
+  const feature = nearestTo(
+    candidates
+      .filter((f) => f.geometry.type === "Point")
+      .map((f) => {
+        const p = map.project((f.geometry as GeoJSON.Point).coordinates as [number, number]);
+        return { item: f, x: p.x, y: p.y };
+      }),
+    at.x,
+    at.y,
+  );
+  if (!feature) return false;
+  const [lng, lat] = (feature.geometry as GeoJSON.Point).coordinates;
+  const { title, subtitle, place } = describeBaseFeature(feature.properties ?? {}, feature.sourceLayer, { lng, lat });
+  showReactPopup(
+    popup,
+    map,
+    { lng, lat } as LngLat,
+    <PlacePopup
+      title={title}
+      subtitle={subtitle}
+      actionLabel="Ajouter à l’itinéraire"
+      onAction={() => {
+        void useTripStore.getState().addPlace(place);
+        popup.remove();
+      }}
+    />,
+  );
+  return true;
+}
+
 function syncVisibility(map: MapLibreMap, layers: LayersState) {
   const vis = (on: boolean) => (on ? "visible" : "none");
   const set = (id: string, on: boolean) => {
@@ -908,6 +1013,10 @@ function syncVisibility(map: MapLibreMap, layers: LayersState) {
   set("freedom-fill", layers.freedom);
   set("freedom-line", layers.freedom);
   set("custom-circle", layers.custom);
+  for (const overlay of BASE_OVERLAYS) {
+    set(baseOverlayLayerId(overlay.key), layers[overlay.key]);
+    set(baseOverlayLabelId(overlay.key), layers[overlay.key]);
+  }
 }
 
 function inferKind(layer: string, props: GeoJSON.GeoJsonProperties): PlaceKind {

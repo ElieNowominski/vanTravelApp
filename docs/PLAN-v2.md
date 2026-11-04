@@ -23,7 +23,7 @@ Prompt de reprise :
 - [x] Lot 3 : géographie libre (3 nov. 2026 : recherche Photon, appui long, plus de région par défaut ; 173 tests, parcours vérifié dans le navigateur)
 - [x] Lot 4 : routage par tronçon (3 nov. 2026 : mode par tronçon, saisie manuelle des trains et ferries ; 187 tests, parcours vérifié dans le navigateur)
 - [x] Lot 5 : points d'intérêt OSM à la demande (3 nov. 2026 : calque de la carte, couloir au figeage, « Sur la route » dans Voyager ; 218 tests ; affichage vérifié dans le navigateur sur données réelles en cache, Overpass saturé pendant la session)
-- [ ] Lot 6 : accueil et création (maquettes puis code)
+- [ ] Lot 6 : accueil et création (maquettes puis code) ; fait le 4 nov. 2026 : fond vectoriel, calques superposés, cache passif des tuiles (230 tests)
 - [ ] Lot 7 : dépenses multi-devises et à plusieurs
 - [ ] Lot 8 : validation et préparation de la fusion
 
@@ -105,19 +105,19 @@ Options :
 - [ ] Maquettes sur un canevas : accueil (voyages en cours, à venir, passés, sobre), création, recherche de lieux. Validation par la personne avant le code.
 - [ ] Création : nom, dates, départ, arrivée (égale au départ par défaut), mode par défaut, préréglage de véhicule. Un seul écran à 390 px.
 - [ ] Ouverture directe sur Voyager pendant un voyage ; « aujourd'hui » calculé dans le fuseau de l'étape en cours.
-- [ ] Fond de carte vectoriel OpenFreeMap Liberty, retenu par la personne le 4 nov. 2026 après le prototype de la branche `proto/fond-vectoriel` (commits `6b85126`, `febb47a`, constats dans leurs messages ; branche à ne pas fusionner). À reprendre proprement, avec tests :
-  - noms de villes, villages, hameaux et lieux du fond cliquables partout, popup « Ajouter à l'itinéraire » ; le lieu le plus proche du doigt, pas le premier trouvé ; nom français (`name:fr`) puis nom local, au lieu du `name_en` du style ;
-  - calques superposés lus dans les tuiles, sans requête ni plafond : campings, hébergements, restos et cafés, courses, carburant et recharge, à voir, toilettes et eau ; visibles à partir du zoom 14 seulement (les tuiles n'ont pas ces lieux en dessous), le calque Overpass du lot 5 garde la vue d'ensemble des campings dès le zoom 11 ;
-  - popup sans la ligne technique du prototype (calque, `class`, `subclass`, `rank`) ;
-  - panneau « Calques » repliable ou en pastilles : avec sept interrupteurs de plus, il couvre la carte à 390 px ;
-  - repli sur les tuiles raster OSM si OpenFreeMap ne répond pas (aucune garantie de service) ; règle 8 de `CLAUDE.md` et attribution OpenMapTiles à mettre à jour.
-- [ ] Data mobile en voyage : **cache passif**, choisi par la personne le 4 nov. 2026. Le service worker garde les tuiles déjà affichées (comme la règle `osm-tiles` de `vite.config.ts` pour le raster) : préparer le voyage sur le Wi-Fi en parcourant les étapes suffit à les avoir sans réseau. Aucun téléchargement en masse. Écartés pour l'instant : préchargement au figeage (au plus 3 000 tuiles chez OpenFreeMap, avec un `User-Agent` que le navigateur ne laisse pas fixer ; il faudrait leur accord écrit) et extrait de carte auto-hébergé (« Hors de la v2 »). Réglages, d'après les en-têtes relevés le 4 nov. 2026 :
-  - tuiles `tiles.openfreemap.org/planet/<version>/…` : `CacheFirst` (servies avec un `max-age` de dix ans, chemin daté donc immuable), nombre d'entrées à fixer selon le poids moyen mesuré ;
-  - index `/planet` (`max-age` d'une heure), style (un jour), sprites et polices : `NetworkFirst` avec un délai court, pour resservir hors ligne la version déjà en cache ;
-  - revers : à chaque nouvelle version hebdomadaire d'OpenFreeMap, une vue en ligne retélécharge ses tuiles. Durée de conservation des anciennes versions inconnue : ne pas figer l'index sans la connaître ;
-  - mesurer avant de fixer les plafonds : poids moyen d'une tuile au zoom 14 en ville et à la campagne, data d'une journée type de navigation.
-  Repères chiffrés (voyage de référence, 4 nov. 2026) : couloir de 3 km, 1 021 tuiles au zoom 12, 3 152 au zoom 13, 9 717 au zoom 14 ; 5 km autour des 9 nuits, 621 tuiles au zoom 14 ; une tuile dense de Bergen au zoom 14, 268 Ko décompressée.
-  Non vérifiés aussi : quota de stockage et éviction du Cache API sur iPhone (web app installée ou Safari).
+- [x] Fond de carte vectoriel OpenFreeMap Liberty (4 nov. 2026), retenu par la personne après le prototype de la branche `proto/fond-vectoriel` (commits `6b85126`, `febb47a`, constats dans leurs messages ; branche à ne pas fusionner). Logique pure dans `src/lib/base-map.ts`, chargement du style dans `src/services/base-map.ts` :
+  - noms de villes, villages, hameaux et lieux du fond cliquables partout, popup « Ajouter à l'itinéraire » (étape `osm-fond:<lng>,<lat>`, `meta.source` `osm`) ; le lieu le plus proche du doigt l'emporte ; noms en français (`name:fr`) puis en local sur les lieux, eaux et sommets, au lieu du `name_en` du style (« Copenhague » et non « København ») ;
+  - sept calques superposés lus dans les tuiles, sans requête ni plafond : campings, hébergements, restos et cafés, à voir (allumés d'office), courses, carburant et recharge, toilettes et eau (éteints) ; à partir du zoom 14 seulement, noms au zoom 15. Le calque Overpass du lot 5 garde la vue d'ensemble des campings dès le zoom 11 ;
+  - panneau « Calques » replié d'office sous 768 px, défilant s'il dépasse la carte ; la section « Lieux de la carte » n'apparaît qu'avec le fond vectoriel ;
+  - repli sur les tuiles raster OSM si le style ne vient pas en 6 s ou n'a pas la forme attendue (OpenFreeMap n'offre aucune garantie de service) ; la capture du PDF masque aussi les calques superposés ;
+  - le comparateur (`compare-map.tsx`) garde le fond raster.
+- [x] Data mobile en voyage : **cache passif** (4 nov. 2026), choisi par la personne. Le service worker garde ce qui a déjà été affiché : préparer le voyage sur le Wi-Fi en parcourant les étapes suffit à l'avoir sans réseau. Aucun téléchargement en masse. Écartés pour l'instant : préchargement au figeage (au plus 3 000 tuiles chez OpenFreeMap, avec un `User-Agent` que le navigateur ne laisse pas fixer ; il faudrait leur accord écrit) et extrait de carte auto-hébergé (« Hors de la v2 »). Réglages (`vite.config.ts`) :
+  - tuiles `tiles.openfreemap.org/planet/<version>/…` : `CacheFirst`, cache `ofm-tiles`, 2 000 tuiles et 90 jours au plus, purge si le quota est dépassé ; chemin daté servi avec un `max-age` de dix ans, une tuile ne change jamais ;
+  - style, index de la semaine `/planet`, icônes, polices, relief : `NetworkFirst` avec 4 s de délai, cache `ofm-style`, pour que la carte retrouve hors ligne les tuiles gardées ;
+  - poids mesurés le 4 nov. 2026 (compressés) : au zoom 14, 170 à 210 Ko en ville (Bergen, Oslo, Stockholm), 25 Ko à Odda, 4 à 9 Ko à la campagne ; au zoom 12, 13 à 46 Ko. Une tuile du zoom 14 sert aussi aux zooms 15 à 18 : zoomer dans une ville ne retélécharge rien ;
+  - revers : à chaque nouvelle version hebdomadaire d'OpenFreeMap, une vue en ligne retélécharge ses tuiles. Durée de conservation des anciennes versions inconnue : l'index n'est pas figé.
+  Repères (voyage de référence) : couloir de 3 km, 1 021 tuiles au zoom 12, 3 152 au zoom 13, 9 717 au zoom 14 ; 5 km autour des 9 nuits, 621 tuiles au zoom 14.
+  Vérifié sur le build (`vite preview`, port 43219) : après navigation, `ofm-tiles` et `ofm-style` se remplissent. Non vérifiés : rechargement réellement hors ligne (réseau du volet non coupable), data d'une journée type, quota de stockage et éviction du Cache API sur iPhone (web app installée ou Safari).
 
 ## Lot 7 : dépenses multi-devises et à plusieurs
 

@@ -216,3 +216,24 @@ Les entrées antérieures au 7 octobre 2026 sont reconstituées après coup depu
   - Le couloir n'est pas synchronisé entre appareils : il pèse et se reconstruit en figeant.
   - Second serveur `private.coffee` seulement : les autres instances publiques sont payantes, régionales ou demandent une clé ; VK Maps n'a pas été retenu (données de position envoyées hors UE, à décider par la personne).
 - **Chiffres** : 218 tests en 28 fichiers (187 avant) ; 32 requêtes pour figer le voyage de référence (206 cases dans le couloir, 294 couvertes) ; réponse Overpass sur Bergen (0,15° × 0,25°) : 24 points, 6,5 Ko ; environ 14 requêtes Overpass envoyées pendant la session, essais à la main compris.
+
+## 2026-11-04 : v2, fond de carte vectoriel, lieux superposés et cache passif (lot 6, en avance)
+
+- **Intention** : pouvoir cliquer sur les villes, villages et lieux partout, comme sur le catalogue de la Nouvelle-Zélande en v1, avec des lieux superposés (restos, campings, hébergements), sans faire exploser la data mobile en voyage.
+- **Demandes** : « qu'est-ce qui est cliquable pour ajouter une étape ? » ; « aucun moyen de cliquer sur des noms de villes, comme en NZ ? » ; prototype ; « B ça me va, mais il faudrait superposer des trucs » ; « la data mobile est à regarder, peut-on figer en avance ? » ; « cache passif » ; « oui, maintenant ».
+- **Livré** : prototype jetable sur `proto/fond-vectoriel` (trois fonds au choix par `?fond=`, puis calques superposés), conservé sans fusion ; dans `v2` : `src/lib/base-map.ts` (calques, noms cliquables, style en français, description d'un lieu, plus proche du doigt), `src/services/base-map.ts` (style avec repli raster), carte et panneau « Calques » repliable, sept calques superposés, cache passif dans `vite.config.ts` ; correctif du lot 5 (capture du PDF) ; décisions inscrites au plan. 12 tests de plus.
+- **Cassé ou appris** :
+  - Le fond raster ne peut pas rendre ses noms cliquables : ce sont des pixels. La question de la personne a mené au changement de fond, plus large que prévu au lot 6.
+  - Les tuiles OpenMapTiles portent tous les lieux d'OSM, noms français compris, mais seulement à partir du zoom 14 : rien au zoom 13. Le calque Overpass du lot 5 reste utile pour la vue d'ensemble des campings.
+  - La personne n'a pas vu le prototype : en fin de prototype, l'assistant avait remis le dossier sur `v2`, et le serveur qu'elle a lancé servait donc la version sans sélecteur. Il fallait le dire en rendant le prototype.
+  - Le prototype attendait `isStyleLoaded()`, qui reste faux tant que des tuiles chargent : calques jamais ajoutés. Puis, volet caché, la carte ne dessinait rien et les requêtes rendaient zéro lieu : l'assistant a d'abord cherché une panne d'OpenFreeMap.
+  - `featureFilter` du moteur de style de MapLibre 26 exige un `rootKey` ; le style raster de repli lit `window` : deux ajustements des tests.
+  - La capture du PDF du lot 5 ne masquait pas le calque des points d'intérêt : vu en relisant `capture-map.ts` pendant le prototype.
+  - Le premier jet du prototype prenait le premier nom trouvé à 14 px, pas le plus proche (Flåm visé, Håreina ouvert). Corrigé et testé.
+- **Décisions** :
+  - OpenFreeMap Liberty plutôt que Positron (choix de la personne) et plutôt qu'un jeu de villes embarqué (les villages manqueraient) ou Overpass (budget).
+  - Calques lus dans les tuiles et non dans Overpass : aucune requête, aucun plafond, aucune dépendance à un serveur saturé.
+  - Cache passif plutôt que préchargement : dans les règles d'OpenFreeMap sans leur accord, et le navigateur ne laisse pas fixer le `User-Agent` qu'ils demandent pour un téléchargement hors ligne.
+  - L'index de la semaine n'est pas figé : sans savoir combien de temps OpenFreeMap garde les anciennes versions, la carte risquerait des trous.
+  - Panneau « Calques » replié d'office sur téléphone : ouvert, il couvrait la carte.
+- **Chiffres** : 230 tests en 30 fichiers (218 avant) ; tuiles du zoom 14 compressées, 170 à 210 Ko en ville, 4 à 25 Ko ailleurs ; à Bergen au zoom 15,5, 122 restos et cafés, 13 hébergements, 8 lieux « à voir » dans une vue ; pour le voyage de référence, 9 717 tuiles au zoom 14 sur un couloir de 3 km.
